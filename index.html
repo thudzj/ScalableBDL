@@ -98,9 +98,12 @@ To render the fine-tuning in the style of training normal NNs, we resort to stoc
 <img src="img/elbo.png" width="1000"> </a></center>
 where q is the approximate posterior initailized as a Gaussian centered at the converged parameters of <em>deterministic pre-training</em>, and p denotes the non-informative parameter prior (we consider an isotropic Gaussian prior without losing generality).
 <br>
-There are <em>two features</em> that distinguish us from existing variational BNNs and make the fine-tuning user-friendly and robust.
-<b>Optimizers with built-in weight decay</b>
-<b>Exemplar reparametrization</b>
+<em>TWO FEATURES</em> that distinguish us from existing variational BNNs and make the fine-tuning user-friendly and robust:
+<ul>
+  <li><b>Optimizers with built-in weight decay</b></li>
+  <li><b>Exemplar reparametrization</b></li>
+</ul>
+
 
 <br><br>
 <h2>Related Work</h2>
