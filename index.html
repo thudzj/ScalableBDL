@@ -1,6 +1,6 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3c.org/TR/1999/REC-html401-19991224/loose.dtd">
 <html xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" lang="en"><head>
-  <title>CycleGAN Project Page</title>
+  <title>Scalable BDL Project Page</title>
 <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
 
 <!-- <meta property="og:image" content="https://junyanz.github.io/CycleGAN/images/teaser_fb.jpg"/> -->
@@ -47,313 +47,33 @@ BODY {
 
 <div id="primarycontent">
 <center><h1>BayesAdapter: Being Bayesian, Inexpensively and Robustly, via Bayeisan Fine-tuning</h1></center>
-<center><h2><a href="http://ml.cs.tsinghua.edu.cn/~zhijie/">Zhijie Deng</a>*&nbsp;&nbsp;&nbsp;
-  <a href="#">Xiao Yang</a>*&nbsp;&nbsp;&nbsp;
+<center><h2><a href="http://ml.cs.tsinghua.edu.cn/~zhijie/">Zhijie Deng</a>&nbsp;&nbsp;&nbsp;
+  <a href="#">Xiao Yang</a>&nbsp;&nbsp;&nbsp;
   <a href="http://www.cs.cmu.edu/~hzhang2/">Hao Zhang</a>&nbsp;&nbsp;&nbsp;
-  <a href="http://ml.cs.tsinghua.edu.cn/~yinpeng/">Yinpeng Dong</a>
+  <a href="http://ml.cs.tsinghua.edu.cn/~yinpeng/">Yinpeng Dong</a>&nbsp;&nbsp;&nbsp;
   <a href="http://ml.cs.tsinghua.edu.cn/~jun/">Jun Zhu</a></h2></center>
 <center><h2><a href="https://www.tsinghua.edu.cn/en/">Tsinghua</a></h2></center>
 <!-- <center><h2>In ICCV 2017</h2></center> -->
 <center><h2><strong><a href="#">Paper</a> | <a href="https://github.com/thudzj/ScalableBDL">PyTorch code</a> </strong> </h2></center>
-<!-- <center><a href="https://junyanz.github.io/CycleGAN/images/teaser_high_res.jpg"> -->
-<!-- <img src="https://junyanz.github.io/CycleGAN/images/teaser.jpg" width="1000"> </a></center> -->
+<center><a href="#">
+<img src="img/framework.png" width="1000"> </a></center>
 <p></p>
 
 
  <p>
 <h2>Abstract</h2>
 
-<div style="font-size:14px"><p align="justify">Image-to-image translation is a class of vision and graphics problems where the goal is to learn the mapping between an input image and an output image using a training set of aligned image pairs.
-However, for many tasks, paired training data will not be available. We present an approach for learning to translate an image from a source domain X to a target domain Y in the absence of paired examples.  Our goal is to learn a mapping G: X &#8594; Y, such that the distribution of images from G(X) is indistinguishable from the distribution Y using an adversarial loss. Because this mapping is highly under-constrained, we couple it with an inverse mapping F: Y &#8594; X and introduce a cycle consistency loss to push F(G(X)) &#8776; X (and vice versa). Qualitative results are presented on several tasks where paired training data does not exist, including collection style transfer, object transfiguration, season transfer, photo enhancement, etc. Quantitative comparisons against several prior methods demonstrate the superiority of our approach.</p></div>
-
-<a href="https://arxiv.org/pdf/1703.10593.pdf"><img style="float: left; padding: 10px; PADDING-RIGHT: 30px;" alt="paper thumbnail" src="images/paper_thumbnail.jpg" width=170></a>
-<br>
-
-
-
-<h2>Paper</h2>
-<p><a href="https://arxiv.org/pdf/1703.10593.pdf">arxiv 1703.10593</a>,  2017. </p>
-
+<div style="font-size:14px"><p align="justify">Despite their theoretical appealingness, Bayesian neural networks (BNNs) are falling far behind in terms of adoption in real-world applications compared with normal NNs, mainly due to their limited scalability in training, and low fidelity in their uncertainty estimates. In this work, we develop a new framework, named BayesAdapter, to address these issues and bring Bayesian deep learning to the masses. The core notion of BayesAdapter is to adapt pre-trained deterministic NNs to be BNNs via Bayesian fine-tuning. We implement Bayesian fine-tuning with a plug-and-play instantiation of stochastic variational inference, and propose exemplar reparameterization to reduce gradient variance and stabilize the fine-tuning. Together, they enable training BNNs as if one were training deterministic NNs with minimal added overheads. During Bayesian fine-tuning, we further propose an uncertainty regularization to supervise and calibrate the uncertainty quantification of learned BNNs at low cost. To empirically evaluate BayesAdapter, we conduct extensive experiments on a diverse set of challenging benchmarks, and observe significantly higher training efficiency, better predictive performance, and more calibrated and faithful uncertainty estimates than existing BNNs. </p></div>
 
 
 <h2>Citation</h2>
-<p>Jun-Yan Zhu*, Taesung Park*, Phillip Isola, and Alexei A. Efros. "Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks", in IEEE International Conference on Computer Vision (ICCV), 2017.
-<br>(* indicates equal contributions)
-<a href="CycleGAN.txt">Bibtex</a>
+<p>Zhijie Deng, Xiao Yang, Hao Zhang, Yinpeng Dong, and Jun Zhu. "BayesAdapter: Being Bayesian, Inexpensively and Robustly, via Bayeisan Fine-tuning". 
+  <!-- , in IEEE International Conference on Computer Vision (ICCV), 2017. -->
+<br>
+<a href="static/bib.txt">Bibtex</a>
 
 </p>
 
-
-<h2>Code: <a href='https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix'>PyTorch</a> | <a href='https://github.com/junyanz/CycleGAN'>Torch</a>  </h2>
-<p>If you have questions about our PyTorch code, please check out <a href='https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/tips.md'>model training/test tips</a> and
-  <a href='https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/docs/qa.md'>frequently asked questions</a>. </p>
-<br>
-
-<h2>Course</h2>
-<p align="justify">CycleGAN course assignment <a href="http://www.cs.toronto.edu/~rgrosse/courses/csc321_2018/assignments/a4-code.zip"> code</a> and <a href="http://www.cs.toronto.edu/~rgrosse/courses/csc321_2018/assignments/a4-handout.pdf">handout</a> designed by Prof. <a href="http://www.cs.toronto.edu/~rgrosse/">Roger Grosse</a> for <a href="http://www.cs.toronto.edu/~rgrosse/courses/csc321_2018/">"Intro to Neural Networks and Machine Learning"</a> at University of Toronto. Please contact the instructor if you would like to adopt this assignment in your course.</p>
-
-<h2>Other Implementations</h2>
-<p><a href="https://github.com/leehomyc/cyclegan-1">Tensorflow</a> (Harry Yang) |
-<a href="https://github.com/architrathore/CycleGAN/">Tensorflow</a> (Archit Rathore) |
-<a href="https://github.com/vanhuyz/CycleGAN-TensorFlow">Tensorflow</a> (Van Huy) |
-<a href="https://github.com/XHUJOY/CycleGAN-tensorflow">Tensorflow</a> (Xiaowei Hu) |
-<a href="https://github.com/luoxier/CycleGAN_Tensorlayer">TensorLayer</a> (luoxier)
-<br>
-<a href="https://github.com/LynnHo/CycleGAN-Tensorflow-Simple">Tensorflow-simple</a> (Zhenliang He) |
-<a href="https://github.com/Aixile/chainer-cyclegan">Chainer</a> (Yanghua Jin) |
-<a href="https://github.com/yunjey/mnist-svhn-transfer">Minimal PyTorch</a> (yunjey) |
-<a href="https://github.com/Ldpe2G/DeepLearningForFun/tree/master/Mxnet-Scala/CycleGAN">Mxnet</a> (Ldpe2G) |
-<a href="https://github.com/tjwei/GANotebooks">lasagne/keras</a> (tjwei)</p>
-</ul>
-<br>
-
-<h2 align='center'> ICCV Spotlight Talk</h2>
-<table border="0" align="center" cellspacing="0" cellpadding="20">
-    <td align="center" valign="middle">
-  <iframe width="560" height="315" src="https://www.youtube.com/embed/AxrKVfjSBiA" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-</td>
-
-</table>
-
-<h2 align='center'> Expository Articles and Videos </h2>
-<table border="0" cellspacing="0" cellpadding="20">
-    <td align="center" valign="middle">
-    <h2>Two minute papers</h2>
-    <p><iframe width="480" height="270" src="https://www.youtube.com/embed/D4C1dB9UheQ" frameborder="0" allowfullscreen></iframe></p>
-    <div style="width:480px; text-align:left; font-size:14px"><p align="justify">Karoly Zsolnai-Feher made the above as part of his very cool <a href="https://www.youtube.com/channel/UCbfYPyITQ-7l4upoX8nvctg">"Two minute papers"</a> series.</p></div>
-   </td>
-
-   <td align="center" valign="middle">
-     <h2>Understanding and Implementing CycleGAN</h2>
-   <p><a href="https://hardikbansal.github.io/CycleGANBlog/"><img src="images/cyclegan_blogs.jpg"  width=480 height=270> </a></p>
-     <div style="width:480px; text-align:left; font-size:14px"><p align="justify">Nice explanation by Hardik Bansal and Archit Rathore, with Tensorflow code documentation.</p></div>
-  </td>
-
-    </tr>
-</table>
-
-
-<h1 align="center"> Creative Applications of CycleGAN</h1>
-<p align="justify">Researchers, developers and artists have tried our code on various image manipulation and artistic creatiion tasks. Here we highlight a few of the many compelling examples. Search <a href="https://twitter.com/search?q=cyclegan&src=typd">CycleGAN</a> in Twitter for more applications.</p>
-
-<a href="images/failure_medical.jpg"><img style="float: left;  PADDING-RIGHT: 30px;" alt="failure" src="images/failure_medical.jpg" width=350></a>
-<p align="justify" body style="background-color:lightgray;"><b>How to interpret CycleGAN results</b>: CycleGAN, as well as any GAN-based method, is fundamentally hallucinating part of the content it creates. Its outputs are predictions of "what might it look like if ..." and the predictions, thought plausible, may largely differ from the ground truth. CycleGAN should only be used with great care and calibration in domains where critical decisions are to be taken based on its output. This is especially true in medical applications, such as translating MRI to CT data. Just as CycleGAN may add fanciful clouds to a sky to make it look like it was painted by Van Gogh, it may add tumors in medical images where none exist, or remove those that do. More information on dangers like this can be found in <a href="https://arxiv.org/pdf/1805.08841">Cohen et al</a>.</p>
-<br><br>
-<table border="0" width="1000px" cellpadding="10">
-<tr>
-  <td width="330px" align="center" valign="top">
-    <h2>Converting Monet into Thomas Kinkade </h2>
-  <a href="https://people.eecs.berkeley.edu/~dfouhey/fun/monet/index.html"><img src="images/monet_david.jpg"  width="330px" > </a>
-    <div style="width:330px; text-align:left; font-size:14px"><p align="justify">What if <a href="https://en.wikipedia.org/wiki/Claude_Monet">Claude Monet</a> had lived to see the rise of Americana pastoral kitsch in the style of <a href="https://en.wikipedia.org/wiki/Thomas_Kinkade">Thomas Kinkade</a>? And what if he resorted to it to support himself in his old age?  Using CycleGAN, our great <a href="https://people.eecs.berkeley.edu/~dfouhey/">David Fouhey</a> finally realized the dream of Claude Monet revisiting his cherished work in light of Thomas Kinkade, the self-stylized painter of light.</p></div>
- </td>
-
-   <td align="center" width="330px" valign="top">
-     <h2>Resurrecting Ancient Cities </h2>
-   <a href="https://jack-clark.net/2017/06/05/import-ai-issue-45/"><img src="images/ancient_maps.jpg"  width="330px"> </a>
-       <div style="width:330px; text-align:left; font-size:14px"><p align="justify"><a href="https://jack-clark.net/about/">Jack Clark</a> used our code to convert ancient maps of <a href="https://twitter.com/jackclarkSF/status/870148599052500993">Babylon</a>, <a href="https://twitter.com/jackclarkSF/status/870935487313100800">Jerusalem</a> and <a href="https://twitter.com/jackclarkSF/status/870115860639121408">London</a> into modern Google Maps and satellite views.</p></div>
-  </td>
-
-  <td align="center" width="330px" valign="top">
-    <h2>Animal Transfiguration</h2>
-  <a href="https://github.com/tatsuyah/CycleGAN-Models"><img src="images/bears_pandas.jpg"  width="340px" > </a>
-  <a href="images/birds_transform.jpg"><img src="images/birds_transform2.jpg"  width="330px" height="130px"> </a>
-     <div style="width:330px; text-align:left; font-size:14px"><p align="justify"><a href="https://github.com/tatsuyah">Tatsuya Hatanaka</a> trained our method to translate black bears to pandas. See more examples and download the models at the <a href="https://github.com/tatsuyah/CycleGAN-Models">website</a>. <a href="https://twitter.com/jointentropy">Matt Powell</a> performed transfiguration between different species of birds</p></div>
- </td>
-    </tr>
-
-    <tr>
-      <td width="330px" align="center" valign="top">
-        <h2>Portrait to Dollface </h2>
-      <a href="https://twitter.com/quasimondo/status/868912712180518912"><img src="images/dollface.jpg"  width="330px"  height="200px"></a>
-        <div style="width:330px; text-align:left; font-size:14px"><p align="justify"><a href="http://quasimondo.com/">Mario Klingemann</a> used our code to translate portraits into dollface. See how the characters in Game of Thrones look like in the doll world.</p></div>
-     </td>
-
-       <td align="center" width="330px" valign="top">
-         <h2>Face &#8596; Ramen </h2>
-       <a href="images/faces_and_ramens.jpg"><img src="images/face_to_ramen.jpg"  width="330px" </a>
-           <div style="width:330px; text-align:left; font-size:14px"><p align="justify"><a href="https://sites.google.com/site/liltak2takuyakato/"> Takuya Kato</a> performed a magical and hilarious Face &#8596; Ramen translation with CycleGAN. Check out more results <a href="images/faces_and_ramens.jpg">here</a></p></div>
-      </td>
-
-      <td align="center" width="330px" valign="top">
-        <h2>Colorizing legacy photographs</h2>
-      <a href="https://twitter.com/quasimondo/status/867023499214413830"><img src="images/colorization.jpg"  width="330px" > </a>
-          <div style="width:330px; text-align:left; font-size:14px"> <p align="justify"><a href="http://quasimondo.com/">Mario Klingemann</a> trained our method to turn legacy black and white photos into color versions.</p></div>
-     </td>
-    </tr>
-
-    <tr>
-      <td width="330px" align="center" valign="top">
-        <h2>Cats  &#8596; Dogs </h2>
-      <a href="http://qiita.com/itok_msi/items/b6b615bc28b1a720afd7#%E8%BF%BD%E5%8A%A0%E5%AE%9F%E9%A8%93%E7%B5%90%E6%9E%9C20170614%E8%BF%BD%E8%A8%987"><img src="images/cats2dogs.jpg"  width="330px"  height="250px"></a>
-        <div style="width:330px; text-align:left; font-size:14px">
-        <p align="justify">  <a href="http://qiita.com/itok_msi">itok_msi</a> produced cats &#8596; dogs CycleGAN results with a local+global discriminator and a smaller cycle loss.</p></div>
-     </td>
-
-     <td width="330px"  align="center" valign="top">
-       <h2>The Electronic Curator </h2>
-       <iframe width="330" height="220" src="https://www.youtube.com/embed/4sZsx4FpMxg" frameborder="0" allowfullscreen></iframe>
-     <div style="width:330px; text-align:left; font-size:14px"><p align="justify">Eran Hadas and Eyal Gruss used CycleGAN to convert human faces into vegetable portraits.
-        They built a real-time art demo which allows users to interact with the model with their own faces.</p></div>
-    </td>
-
-    <td width="330px"  align="center" valign="top">
-      <h2>Turning Fortnite into PUBG</h2>
-      <iframe width="330" height="220" src="https://www.youtube.com/embed/xkLtgwWxrec" frameborder="0" allowfullscreen></iframe>
-    <div style="width:330px; text-align:left; font-size:14px align:justify"><p align="justify"><a href="https://towardsdatascience.com/@chintan.t93">Chintan Trivedi</a> used CycleGAN to translate between Fornite and PURB, two popular Battle Royale games with hundreds of millions of users. Now you can enjoy the gameplay of one game in the visuals of the other. Check out his <a href="https://towardsdatascience.com/turning-fortnite-into-pubg-with-deep-learning-cyclegan-2f9d339dcdb0">blog</a> for more cool demos.</p></div>
-   </td>
-    </tr>
-</table>
-
-
-<h2 align="center">Popular Press</h2>
-
-<table align="center" border="0" cellspacing="10" cellpadding="0">
-  <tr>
-    <td><a href="https://www.forbes.com/sites/quora/2017/07/21/whats-next-for-deep-learning/#2b758c631002"><img src="logos/forbes.jpg"  width="120"></td>
-
-<td><a href="https://news.ycombinator.com/item?id=14004329"><img src="logos/hackernews.jpg"  width="120"></td>
-  <td><a href="http://mashable.com/2017/04/03/ucberkeley-bair-image-translation/#J9lyvBqRmsqg"><img src="logos/mashable.jpg"  width="120"></td>
-    <td><a href="https://www.engadget.com/2017/04/03/reverse-prisma-ai-turns-monet-paintings-into-photos/"><img src="logos/engadget.jpg"  width="120"></td>
-    <td><a href="https://www.digitaltrends.com/photography/uc-berkeley-ai-software-unpaired-image-transfer/"><img src="logos/digital_trend.jpg"  width="120"></td>
- <td><a href="https://www.dpreview.com/news/0947543575/image-style-ai-can-convert-paintings-to-photographs"><img src="logos/dpreview.jpg"  width="120"></td>
-   <td><a href="http://www.konbini.com/us/lifestyle/cycle-gan-app-turn-paintings-into-photos/"><img src="logos/konbini.jpg"  width="120"></td>
-   </tr>
-  <tr>
-    <td><a href="https://www.wired.com/story/future-of-artificial-intelligence-2018/"><img src="logos/wired.jpg"  width="120"></td>
-     <td><a href="https://blogs.nvidia.com/blog/d2017/05/17/generative-adversarial-network/"><img src="logos/nvidia.jpg"  width="120"></td>
-    <td><a href="https://thenextweb.com/artificial-intelligence/2017/04/19/artificial-intelligence-turn-horse-zebra/#.tnw_vLytDj53"><img src="logos/tnw.jpg"  width="120"></td>
-      <td><a href="https://www.yahoo.com/tech/researchers-invent-opposite-prisma-science-195146532.html"><img src="logos/yahoo.jpg"  width="120"></td>
-    <td><a href="https://petapixel.com/2017/04/03/ai-can-convert-paintings-photos-summer-winter/"><img src="logos/petapixel.jpg"  width="120"></td>
-   <td><a href="http://gizmodo.com/someone-finally-hijacked-deep-learning-tech-to-create-m-1793957126"><img src="logos/gizmodo.jpg"  width="120"></td>
-<td><a href="http://www.horsetalk.co.nz/2017/04/23/algorithm-party-trick-horses-zebras/#axzz4j5oRHvUD"><img src="logos/horsetalk.jpg"  width="120"></td>
-
-  </tr>
-
-</table>
-<br>
-
-
-<h2 align='center'>Applications in our Paper</h2>
-
-<table border="0" cellspacing="0" cellpadding="0">
-  <tr>
-    <td align="center" valign="middle"><h2>Monet Paintings &#8594; Photos</h2>
-    <p font-size:14px> Mapping Monet paintings to landscape photographs from Flickr: <br> <a href="https://taesungp.github.io/cyclegan/2017/03/25/monet-to-photo-summary.html">Best results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/monet-to-photo-trainset.html">Random training set results</a> | <a href="https://taesung.github.io/cyclegan/2017/03/25/monet-to-photo-testset.html">Random test set results</a></p></td>
-  </tr>
-  <tr>
-      <td align="center" valign="middle"><a href="images/painting2photo.jpg"><img src="images/painting2photo.jpg"  width=1000> </a></td>
-  </tr>
-</table>
-<p>&nbsp;</p>
-
-
-<table border="0" cellspacing="0" cellpadding="0">
-  <tr>
-    <td align="center" valign="middle"><h2>Collection Style Transfer</h2>
-    <p> Transferring input images into artistic styles of Monet, Van Gogh, Ukiyo-e, and Cezanne. <br> <a href="https://taesungp.github.io/cyclegan/2017/03/25/style-transfer-supplemental.html">Results on the author's personal photos</a> <br> <a href="https://taesungp.github.io/cyclegan/2017/03/25/style-transfer-train.html">Random training set results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/style-transfer-test.html">Random test set results</a></p></td>
-  </tr>
-  <tr>
-      <td align="center" valign="middle"><a href="images/photo2painting.jpg"><img src="images/photo2painting.jpg"  width=1000> </a></td>
-  </tr>
-</table>
-<p>&nbsp;</p>
-<table border="0" cellspacing="0" cellpadding="0">
-  <tr>
-    <td align="center" valign="middle"><h2>Object Transfiguration</h2>
-    <p> Object transfiguration between horses and zebras: <br><a href="https://taesungp.github.io/cyclegan/2017/03/25/horse-to-zebra-supplemental-best.html">Best results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/horse-to-zebra-supplemental-train.html">Random training set results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/horse-to-zebra-supplemental-test.html">Random test set results</a> <br>
-    Object transfiguration between apples and oranges: <br><a href="https://taesungp.github.io/cyclegan/2017/03/25/apple-to-orange-supplemental-best.html">Best results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/supplemental-apple-to-orange-train.html">Random training set results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/supplemental-apple-to-orange-test.html">Random test set results</a></p></td>
-  </tr>
-  <tr>
-      <td align="center" valign="middle"><a href="images/objects.jpg"><img src="images/objects.jpg"  width=1000> </a></td>
-  </tr>
-  <tr>
-    <td align="center" valign="middle"><h2>Horse Video to Zebra Video</h2>
-    </tr>
-    <tr>
-    <td align="center" valign="middle">
-    <p> <iframe width="560" height="315" src="https://www.youtube.com/embed/9reHvktowLY" frameborder="0" allowfullscreen></iframe></p>
-   </td>
-    </tr>
-</table>
-<p>&nbsp;</p>
-
-
-<table align="center" border="0" cellspacing="0" cellpadding="10">
-  <tr>
-    <h2 align="center">Driving Applications (CG &#8594; Real and Day &#8594; Night )</h2>
-    <p align="center"> Translation between driving scenes in different style. Each frame was rendered independently.
-    </p>
-  </tr>
-  <tr>
-        <p align="center"> Between <a href="https://www.cityscapes-dataset.com/">Cityscapes</a> and <a href="https://download.visinf.tu-darmstadt.de/data/from_games/">GTA dataset</a> </p>
-        <p align="center"> <iframe width="700" height="394" src="https://www.youtube.com/embed/lCR9sT9mbis" frameborder="0" allowfullscreen></iframe> </p>
-  </tr>
-  <tr>
-        <p align="center"> Between Day and Night driving using the <a href="https://deepdrive.berkeley.edu/">Berkeley Deep Drive</a> dataset (not public yet) </p>
-        <p align="center"> <iframe width="700" height="394" src="https://www.youtube.com/embed/N7KbfWodXJE" frameborder="0" allowfullscreen></iframe> </p>
-
-  </tr>
-        <p align="center"> The GTA &#8594; Cityscapes results of CycleGAN can be used for domain adaptation for segmentation.
-<br>A segmentation model trained on the Cityscapes-style GTA images yields mIoU of 37.0 on the segmentation task on Cityscapes.
-<br>More information can be found at <a href="https://arxiv.org/abs/1711.03213">Cycada</a>.
-<br>You can download the <a href="http://efrosgans.eecs.berkeley.edu/cyclegta/gta.zip">original GTA images (18GB)</a> and <a href="http://efrosgans.eecs.berkeley.edu/cyclegta/cyclegta.zip">the translated Cityscapes-style GTA images (16GB)</a>. </p>
-
-  <tr>
-        <td align="center" valign="middle"><img src="images/gta2cityscapes.png" width=1000> </td>
-  </tr>
-</table>
-<p>&nbsp;</p>
-
-<table border="0" cellspacing="0" cellpadding="0">
-  <tr>
-    <td align="center" valign="middle"><h2>Season Transfer</h2>
-    <p> Transferring seasons of Yosemite in the Flickr photos: <br><a href="https://taesungp.github.io/cyclegan/2017/03/25/yosemite-supplemental-best.html">Best results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/yosemite-supplemental-train.html">Random training set results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/yosemite-supplemental-test.html">Random test set results</a> </p></td>
-  </tr>
-  <tr>
-      <td align="center" valign="middle"><a href="images/season.jpg"><img src="images/season.jpg"  width=1000> </a></td>
-  </tr>
-</table>
-<p>&nbsp;</p>
-
-<table border="0" cellspacing="0" cellpadding="0">
-  <tr>
-    <td align="center" valign="middle"><h2>Photo Enhancement</h2>
-    <p> iPhone photos &#8594; DSLR photos: generating photos with shallower depth of field. <br><a href="https://taesungp.github.io/cyclegan/2017/03/25/iphone-to-dslr-flower-best.html">Best Results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/iphone-to-dslr-flower-train-random.html">Random training set results</a> | <a href="https://taesungp.github.io/cyclegan/2017/03/25/iphone-to-dslr-flower-test-random.html">Random test set results</a>
-    </p></td>
-  </tr>
-  <tr>
-      <td align="center" valign="middle"><a href="images/photo_enhancement.jpg"><img src="images/photo_enhancement.jpg"  width=1000> </a></td>
-  </tr>
-</table>
-<p>&nbsp;</p>
-
-
-
-
-
-<h2>Experiments and comparisons</h2>
-<ul id='comparison'>
-  <li font-size: 15px><a href="https://taesungp.github.io/cyclegan/2017/03/25/cityscapes-comparison.html"> Comparison on Cityscapes</a>: different methods for mapping labels &#8596; photos trained on Cityscapes.</li>
-  <li font-size: 15px><a href="https://taesungp.github.io/cyclegan/2017/03/25/maps-comparison.html"> Comparison on Maps</a>: different methods for mapping aerialphotos &#8596; maps on Google Maps.</a></li>
-  <li font-size: 15px><a href="https://taesungp.github.io/cyclegan/2017/03/25/facades.html"> Facade results</a>: CycleGAN for mapping labels &#8596; facades on <a href="http://cmp.felk.cvut.cz/~tylecr1/facade/">CMP</a> Facades datasets.</li>
-<li font-size: 15px><a href="https://taesungp.github.io/cyclegan/2017/03/25/cityscapes-ablation.html">Ablation studies</a>: different variants of our method for mapping labels &#8596; photos trained on Cityscapes.</li>
-<li font-size: 15px><a href="https://taesungp.github.io/cyclegan/2017/03/25/reconstructed-images.html">Image reconstruction results</a>:  the reconstructed  images F(G(x)) and G(F(y)) from  various experiments.</li>
-<li font-size: 15px><a href="https://taesungp.github.io/cyclegan/2017/03/25/gatys-comparison.html">Style transfer comparison</a>:  we compare our method with neural style transfer [Gatys et al. '15].</li>
-<li font-size: 15px><a href="https://taesungp.github.io/cyclegan/2017/03/25/monet-to-photo-idt-comparison.html">Identity mapping loss</a>:  the effect of the identity mapping loss on Monet to Photo.</li>
-</ul>
-
-<h2>Failure Cases</h2>
-<ul id='failure'>
-<a href="images/failure_putin.jpg"><img style="float: left;  PADDING-RIGHT: 30px;" alt="failure" src="images/failure_putin.jpg" width=350></a>
-<p align="justify">Our model does not work well when a test image looks unusual compared to training images, as shown in the left figure. See more typical failure cases <a href="images/failures.jpg">[here]</a>. On translation tasks that involve color and texture changes, as many of those reported above, the method often succeeds. We have also explored tasks that require geometric changes, with little success. For example, on the task of dog &#8596; cat transfiguration, the learned translation degenerates into making minimal changes to the input. Handling more varied and extreme transformations, especially geometric changes, is an important problem for future work. We also observe a lingering gap between the results achievable with paired training data and those achieved by our unpaired method. In some cases, this gap may be very hard -- or even impossible -- to close: for example, our method sometimes permutes the labels for tree and building in the output of the cityscapes photos &#8594; labels task. Resolving this ambiguity may require some form of weak semantic supervision. Integrating weak or semi-supervised data may lead to substantially more powerful translators, still at a fraction of the annotation cost of the fully-supervised systems.
-</p>
-
-
-<td style="vertical-align: middle;">
-    <h2 style="text-align: center;">Meet the Authors of CycleGAN</h2>
-</td>
-<br>
-<p align="center"> <iframe width="560" height="315" src="https://www.youtube.com/embed/05zzhkyofLE?rel=0&amp;autoplay=1;loop=1;playlist=05zzhkyofLE" frameborder="0" align="middle" allowfullscreen></iframe></p>
 
 
 
