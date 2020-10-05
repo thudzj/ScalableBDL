@@ -83,7 +83,22 @@ Unfold the learning of a BNN into two steps: <em>deterministic pre-training</em>
   <li>We can bypass extensive local optimum suffered by a direct learning of BNN.</li>
 </ul>
 
+<br><br>
+<h2>Deterministic Pre-training</h2>
+This stage trains a regular DNN under <em>maximum a posteriori</em> (MAP) estimation. 
+<center><a href="#">
+<img src="img/map.png" width="1000"> </a></center>
+Advanced techniques (e.g., radical data augmentation, batch normalization, data-parallel distributed training) can be freely incorporated to improve the parameter training.
 
+
+<br><br>
+<h2>Bayesian Fine-tuning</h2>
+To render the fine-tuning in the style of training normal NNs, we resort to stochastic variational inference (VI) to update the approximate posterior. Typically, we maximize the evidence lower bound (ELBO):
+<center><a href="#">
+<img src="img/elbo.png" width="1000"> </a></center>
+There are <em>two features</em> that distinguish us from existing variational BNNs and make the fine-tuning user-friendly and robust.
+<b>Optimizers with built-in weight decay</b>
+<b>Exemplar reparametrization</b>
 
 <br><br>
 <h2>Related Work</h2>
