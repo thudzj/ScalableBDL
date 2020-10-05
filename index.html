@@ -72,6 +72,16 @@ BODY {
 <div style="font-size:14px"><p align="justify">Despite their theoretical appealingness, Bayesian neural networks (BNNs) are falling far behind in terms of adoption in real-world applications compared with normal NNs, mainly due to their limited scalability in training, and low fidelity in their uncertainty estimates. In this work, we develop a new framework, named BayesAdapter, to address these issues and bring Bayesian deep learning to the masses. The core notion of BayesAdapter is to adapt pre-trained deterministic NNs to be BNNs via Bayesian fine-tuning. We implement Bayesian fine-tuning with a plug-and-play instantiation of stochastic variational inference, and propose exemplar reparameterization to reduce gradient variance and stabilize the fine-tuning. Together, they enable training BNNs as if one were training deterministic NNs with minimal added overheads. During Bayesian fine-tuning, we further propose an uncertainty regularization to supervise and calibrate the uncertainty quantification of learned BNNs at low cost. To empirically evaluate BayesAdapter, we conduct extensive experiments on a diverse set of challenging benchmarks, and observe significantly higher training efficiency, better predictive performance, and more calibrated and faithful uncertainty estimates than existing BNNs. </p></div>
 
 
+<br><br>
+<h2>Core Idea</h2>
+Unfold the learning of a BNN into two steps: <em>deterministic pre-training</em> of the deep neural network (DNN) counterpart of the BNN followed by several-round <em>Bayesian fine-tuning</em>.
+<br>
+<b>Advantages</b>
+<ul>
+  <li>We can learn a principled BNN with slightly more efforts than training a regular DNN.</li>
+  <li>We can embrace qualified off-the-shelf pre-trained DNNs (e.g., those on PyTorch Hub).</li>
+  <li>We can bypass extensive local optimum suffered by a direct learning of BNN.</li>
+</ul>
 
 
 
