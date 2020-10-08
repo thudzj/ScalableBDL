@@ -23,9 +23,6 @@ if __name__ == '__main__':
     train_loader, test_loader = load_dataset(args)
 
     net = wrn(pretrained=True, depth=28, width=10).cuda()
-    for m in net.modules():
-        if m.__class__.__name__.startswith('Dropout'): 
-            m.eval()
     bayesian_net = to_bayesian(net)
 
     mus, psis = [], []
@@ -40,6 +37,9 @@ if __name__ == '__main__':
                 lr=0.1, momentum=0.9, nesterov=True, num_data=50000)
 
     bayesian_net.train()
+    for m in bayesian_net.modules():
+        if m.__class__.__name__.startswith('Dropout'): 
+            m.eval()
     criterion = torch.nn.CrossEntropyLoss().cuda()
     for epoch in range(args.epochs):
         for i, (input, target) in enumerate(train_loader):
