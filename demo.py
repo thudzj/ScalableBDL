@@ -35,7 +35,7 @@ if __name__ == '__main__':
         else: 
             mus.append(param)
     mu_optimizer = torch.optim.SGD([{'params': mus, 'weight_decay': 2e-4}], 
-                lr=0.1, momentum=0.9, nesterov=True)
+                lr=0.0008, momentum=0.9, nesterov=True)
     psi_optimizer = PsiSGD([{'params': psis, 'weight_decay': 2e-4}],
                 lr=0.1, momentum=0.9, nesterov=True, num_data=50000)
 
@@ -52,7 +52,8 @@ if __name__ == '__main__':
             mu_optimizer.zero_grad()
             psi_optimizer.zero_grad()
             loss.backward()
-            print("Epoch {}, ite {}, loss {}".format(epoch, i, loss.item()))
+            print("Epoch {}, ite {}/{}, loss {}".format(epoch, i, 
+                len(train_loader), loss.item()))
             mu_optimizer.step()
             psi_optimizer.step()
     
