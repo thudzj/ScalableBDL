@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.nn import Linear, Conv2d, BatchNorm2d
 
-from mean_field_layers import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
+from mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
 from utils import freeze, unfreeze
 
 def to_bayesian(input, psi_init_range=[-6, -5]):
@@ -74,48 +74,3 @@ def _to_deterministic(input):
             setattr(input, name, to_deterministic(module))
         return input
 
-
-if __name__ == '__main__':
-    class CNN(nn.Module):
-        def __init__(self):
-            super(CNN, self).__init__()
-            
-            self.conv_layer = nn.Sequential(
-                nn.Conv2d(1,3,3),
-                nn.ReLU(),
-                nn.BatchNorm2d(3),
-                nn.MaxPool2d(2,2)
-            )
-            
-            self.fc_layer = nn.Sequential(
-                nn.Linear(3*2*2,3*2),
-                nn.ReLU(),
-                nn.Linear(3*2,2)
-            )       
-            
-        def forward(self,x):
-            out = self.conv_layer(x)
-            out = out.view(-1,3*2*2)
-            out = self.fc_layer(out)
-            return out    
-
-    model = CNN()
-    with torch.no_grad():
-        model.conv_layer[2].running_mean = torch.randn(3)
-        model.conv_layer[2].running_var = torch.ones(3) * 10
-
-    dummy = torch.rand(64, 1, 4, 4)
-    model.eval()
-    print(model(dummy).norm())
-
-    bayes_model = to_bayesian(model)
-    bayes_model.eval()
-    print(bayes_model(dummy).norm())
-
-    bayes_model.apply(freeze)
-    bayes_model.eval()
-    print(bayes_model(dummy).norm())
-
-    deter_model = to_deterministic(bayes_model)
-    deter_model.eval()
-    print(deter_model(dummy).norm())

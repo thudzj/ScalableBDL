@@ -1,9 +1,10 @@
 import argparse
 from tqdm import tqdm
 import torch
+from torch.optim import SGD
 from converter import to_bayesian, to_deterministic
-from utils import freeze, unfreeze
-from optimizers import PsiSGD
+from utils import freeze, unfreeze, disable_dropout
+from mean_field import PsiSGD
 
 import sys
 sys.path.insert(0, './reproduction')
@@ -23,39 +24,35 @@ if __name__ == '__main__':
     train_loader, test_loader = load_dataset(args)
 
     net = wrn(pretrained=True, depth=28, width=10).cuda()
+    disable_dropout(net)
     bayesian_net = to_bayesian(net)
+    bayesian_net.apply(unfreeze)
 
     mus, psis = [], []
     for name, param in bayesian_net.named_parameters():
-        if 'psi' in name: 
-            psis.append(param)
-        else: 
-            mus.append(param)
-    mu_optimizer = torch.optim.SGD([{'params': mus, 'weight_decay': 2e-4}], 
-                lr=0.0008, momentum=0.9, nesterov=True)
-    psi_optimizer = PsiSGD([{'params': psis, 'weight_decay': 2e-4}],
-                lr=0.1, momentum=0.9, nesterov=True, num_data=50000)
+        if 'psi' in name: psis.append(param)
+        else: mus.append(param)
+    mu_optimizer = SGD(mus, 0.0008, 0.9, weight_decay=2e-4, nesterov=True)
+    psi_optimizer = PsiSGD(psis, 0.1, 0.9, weight_decay=2e-4, 
+                           nesterov=True, num_data=50000)
 
-    bayesian_net.train()
-    for m in bayesian_net.modules():
-        if m.__class__.__name__.startswith('Dropout'): 
-            m.eval()
-    criterion = torch.nn.CrossEntropyLoss().cuda()
+    bayesian_net.train()    
     for epoch in range(args.epochs):
         for i, (input, target) in enumerate(train_loader):
             input = input.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True)
 
             output = bayesian_net(input)
-            loss = criterion(output, target)
+            loss = F.cross_entropy(output, target)
 
             mu_optimizer.zero_grad()
             psi_optimizer.zero_grad()
             loss.backward()
+            mu_optimizer.step()
+            psi_optimizer.step()
+
             if i % 100 == 0:
                 print("Epoch {}, ite {}/{}, loss {}".format(epoch, i, 
                     len(train_loader), loss.item()))
-            mu_optimizer.step()
-            psi_optimizer.step()
-    
+
     
