@@ -31,7 +31,7 @@ if __name__ == '__main__':
     args.workers = 4
     train_loader, test_loader = load_dataset(args)
 
-    net = wrn(pretrained=True, depth=28, width=10)
+    net = wrn(pretrained=True, depth=28, width=10).cuda()
     # print(net)
     print(acc(net, test_loader))
 

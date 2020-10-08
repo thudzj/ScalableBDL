@@ -34,8 +34,10 @@ def _to_bayesian(input, psi_init_range=[-6, -5]):
         setattr(output, 'bias_mu', getattr(input, 'bias'))
 
         output.weight_psi.data.uniform_(psi_init_range[0], psi_init_range[1])
+        output.weight_psi.to(output.weight_mu.device)
         if output.bias_psi is not None:
             output.bias_psi.data.uniform_(psi_init_range[0], psi_init_range[1])
+            output.bias_psi.to(output.bias_mu.device)
 
         return output
     else:

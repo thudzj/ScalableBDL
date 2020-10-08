@@ -98,6 +98,7 @@ class BayesConv2dMF(_BayesConvNdMF):
                             stride=self.stride, dilation=self.dilation,
                             groups=self.groups, padding=self.padding)
         else:
+            print(input.device, self.weight_mu.device)
             bs = input.shape[0]
             weight = self.mul_exp_add(torch.randn(bs, *self.weight_size, 
                                                   device=input.device, 
