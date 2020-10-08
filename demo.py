@@ -15,6 +15,8 @@ def acc(model, loader):
     num_true = 0
     with torch.no_grad():
         for i, (input, target) in tqdm(enumerate(loader), total=100):
+            input = input.cuda(non_blocking=True)
+            target = target.cuda(non_blocking=True)
             num_true += (model(input).argmax(1) == target).int().sum().item()
     return num_true/float(len(test_loader.dataset))
 
