@@ -1,3 +1,9 @@
 .DS_Store
 BayesAdapter/*
 BayesAdapter
+__pycache__
+optimizers/__pycache__
+reproduction/models/__pycache__
+reproduction/dataset/__pycache__
+mean_field_layers/__pycache__
+data

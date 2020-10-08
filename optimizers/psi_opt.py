@@ -1,7 +1,7 @@
 import torch
 from torch.optim.optimizer import required
 
-class VarSGD(torch.optim.Optimizer):
+class PsiSGD(torch.optim.Optimizer):
     r"""Implements stochastic gradient descent (optionally with momentum).
 
     Nesterov momentum is based on the formula from
@@ -64,11 +64,11 @@ class VarSGD(torch.optim.Optimizer):
                         weight_decay=weight_decay, nesterov=nesterov)
         if nesterov and (momentum <= 0 or dampening != 0):
             raise ValueError("Nesterov momentum requires a momentum and zero dampening")
-        super(VarSGD, self).__init__(params, defaults)
+        super(PsiSGD, self).__init__(params, defaults)
         self.num_data = num_data
 
     def __setstate__(self, state):
-        super(VarSGD, self).__setstate__(state)
+        super(PsiSGD, self).__setstate__(state)
         for group in self.param_groups:
             group.setdefault('nesterov', False)
 
@@ -113,20 +113,3 @@ class VarSGD(torch.optim.Optimizer):
                 p.add_(d_p, alpha=-group['lr'])
 
         return loss
-
-
-class NoneOptimizer():
-    def __init__(self):
-        self.param_groups = [{'lr': 0}]
-
-    def zero_grad(self):
-        pass
-
-    def step(self):
-        pass
-
-    def load_state_dict(self, _):
-        pass
-
-    def state_dict(self, **kargs):
-        return None

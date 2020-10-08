@@ -5,44 +5,37 @@ from torch.nn import Module, Parameter
 import torch.nn.init as init
 import torch.nn.functional as F
 
+from .utils import MulExpAddFunction
+
 class _BayesBatchNormMF(Module):
     r"""
     Applies Bayesian Batch Normalization over a 2D or 3D input
-
-    Arguments:
-
-    .. note:: other arguments are following batchnorm of pytorch 1.2.0.
-    https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/batchnorm.py
-
     """
-
-    _version = 2
     __constants__ = ['track_running_stats',
                      'momentum', 'eps', 'weight', 'bias',
                      'running_mean', 'running_var', 'num_batches_tracked',
                      'num_features', 'affine']
 
-    def __init__(self, single_eps, num_features, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True, deterministic=False):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, 
+                 track_running_stats=True, deterministic=False):
         super(_BayesBatchNormMF, self).__init__()
         self.num_features = num_features
         self.eps = eps
         self.momentum = momentum
         self.affine = affine
         self.track_running_stats = track_running_stats
-        self.single_eps = single_eps
         self.deterministic = deterministic
         if self.affine:
-
             self.weight_mu = Parameter(torch.Tensor(num_features))
-            self.weight_log_sigma = Parameter(torch.Tensor(num_features))
+            self.weight_psi = Parameter(torch.Tensor(num_features))
 
             self.bias_mu = Parameter(torch.Tensor(num_features))
-            self.bias_log_sigma = Parameter(torch.Tensor(num_features))
+            self.bias_psi = Parameter(torch.Tensor(num_features))
         else:
             self.register_parameter('weight_mu', None)
-            self.register_parameter('weight_log_sigma', None)
+            self.register_parameter('weight_psi', None)
             self.register_parameter('bias_mu', None)
-            self.register_parameter('bias_log_sigma', None)
+            self.register_parameter('bias_psi', None)
         if self.track_running_stats:
             self.register_buffer('running_mean', torch.zeros(num_features))
             self.register_buffer('running_var', torch.ones(num_features))
@@ -53,6 +46,10 @@ class _BayesBatchNormMF(Module):
             self.register_parameter('num_batches_tracked', None)
         self.reset_parameters()
 
+        self.weight_size = list(self.weight_mu.shape) if self.affine else None
+        self.bias_size = list(self.bias_mu.shape) if self.affine else None
+        self.mul_exp_add = MulExpAddFunction.apply
+
     def reset_running_stats(self):
         if self.track_running_stats:
             self.running_mean.zero_()
@@ -62,10 +59,10 @@ class _BayesBatchNormMF(Module):
     def reset_parameters(self):
         self.reset_running_stats()
         if self.affine:
-            self.weight_mu.data.uniform_()
-            self.weight_log_sigma.data.fill_(-5)
+            self.weight_mu.data.fill_(1)
+            self.weight_psi.data.uniform_(-6, -5)
             self.bias_mu.data.zero_()
-            self.bias_log_sigma.data.fill_(-5)
+            self.bias_psi.data.uniform_(-6, -5)
 
     def _check_input_dim(self, input):
         raise NotImplementedError
@@ -92,24 +89,24 @@ class _BayesBatchNormMF(Module):
             exponential_average_factor, self.eps)
 
         if self.affine :
-            if self.single_eps or self.deterministic:
-                if self.deterministic:
-                    weight = self.weight_mu
-                    bias = self.bias_mu
-                else:
-                    weight = self.weight_mu + torch.exp(self.weight_log_sigma) * \
-                            torch.randn(self.num_features, device=input.device, dtype=input.dtype)
-                    bias = self.bias_mu + torch.exp(self.bias_log_sigma) * \
-                            torch.randn(self.num_features, device=input.device, dtype=input.dtype)
-                weight = weight.unsqueeze(0)
-                bias = bias.unsqueeze(0)
+            if self.deterministic:
+                weight = self.weight_mu.unsqueeze(0)
+                bias = self.bias_mu.unsqueeze(0)
             else:
-                weight = self.weight_mu + torch.exp(self.weight_log_sigma) * \
-                        torch.randn(input.shape[0], self.num_features, device=input.device, dtype=input.dtype)
-                bias = self.bias_mu + torch.exp(self.bias_log_sigma) * \
-                        torch.randn(input.shape[0], self.num_features, device=input.device, dtype=input.dtype)
+                bs = input.shape[0]
+                weight = self.mul_exp_add(torch.randn(bs, *self.weight_size, 
+                                                      device=input.device, 
+                                                      dtype=input.dtype),
+                                          self.weight_psi, self.weight_mu)
+
+                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size, 
+                                                  device=input.device, 
+                                                  dtype=input.dtype),
+                                        self.bias_psi, self.bias_mu)
+
             if out.dim() == 4:
-                out = torch.addcmul(bias[:, :, None, None], weight[:, :, None, None], out)
+                out = torch.addcmul(bias[:, :, None, None], 
+                                    weight[:, :, None, None], out)
             elif out.dim() == 2:
                 out = torch.addcmul(bias, weight, out)
             else:
@@ -137,14 +134,7 @@ class _BayesBatchNormMF(Module):
 class BayesBatchNorm2dMF(_BayesBatchNormMF):
     r"""
     Applies Bayesian Batch Normalization over a 2D input
-
-    Arguments:
-
-    .. note:: other arguments are following batchnorm of pytorch 1.2.0.
-    https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/batchnorm.py
-
     """
-
     def _check_input_dim(self, input):
         if input.dim() != 4:
             raise ValueError('expected 4D input (got {}D input)'
