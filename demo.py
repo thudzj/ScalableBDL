@@ -45,5 +45,23 @@ if __name__ == '__main__':
     deterministic_net = to_deterministic(bayesian_net)
     # print(deterministic_net)
     print(acc(deterministic_net, test_loader))
+
+    '''
+    criterion = torch.nn.CrossEntropyLoss()
+    for i, (input, target) in enumerate(train_loader):
+        data_time.update(time.time() - end)
+
+        input = input.cuda(args.gpu, non_blocking=True)
+        target = target.cuda(args.gpu, non_blocking=True)
+
+        output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]))
+        loss = criterion(output[:bs], target)
+
+        optimizer.zero_grad()
+        var_optimizer.zero_grad()
+        (loss+rank_loss*args.alpha).backward()
+        optimizer.step()
+        var_optimizer.step()
+    '''
     
     
