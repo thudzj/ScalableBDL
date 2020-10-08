@@ -14,7 +14,7 @@ def acc(model, loader):
     model.eval()
     num_true = 0
     with torch.no_grad():
-        for i, (input, target) in tqdm(enumerate(loader), total=100):
+        for i, (input, target) in tqdm(enumerate(loader), total=1000):
             input = input.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True)
             num_true += (model(input).argmax(1) == target).int().sum().item()
@@ -23,6 +23,7 @@ def acc(model, loader):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
+    args.epochs = 1
     args.dataset = 'cifar10'
     args.data_path = './data'
     args.cutout = True
@@ -32,36 +33,31 @@ if __name__ == '__main__':
     train_loader, test_loader = load_dataset(args)
 
     net = wrn(pretrained=True, depth=28, width=10).cuda()
-    # print(net)
-    print(acc(net, test_loader))
-
     bayesian_net = to_bayesian(net)
-    # print(bayesian_net)
-    print(acc(bayesian_net, test_loader))
 
-    bayesian_net.apply(freeze)
-    print(acc(bayesian_net, test_loader))
+    mus, psis = [], []
+    for name, param in bayesian_net.named_parameters():
+        if 'psi' in name: psis.append(param)
+        else: assert(param.requires_grad); mus.append(param)
+    print(len(mus), len(psis))
+    mu_optimizer = torch.optim.SGD([{'params': mus, 'weight_decay': 2e-4}], 
+                lr=0.1, momentum=0.9, nesterov=True)
+    psi_optimizer = psi_opt([{'params': psis, 'weight_decay': 2e-4}],
+                lr=0.1, momentum=0.9, nesterov=True, num_data=50000)
 
-    deterministic_net = to_deterministic(bayesian_net)
-    # print(deterministic_net)
-    print(acc(deterministic_net, test_loader))
+    criterion = torch.nn.CrossEntropyLoss().cuda()
+    for epoch in range(args.epochs):
+        for i, (input, target) in enumerate(train_loader):
+            input = input.cuda(non_blocking=True)
+            target = target.cuda(non_blocking=True)
 
-    '''
-    criterion = torch.nn.CrossEntropyLoss()
-    for i, (input, target) in enumerate(train_loader):
-        data_time.update(time.time() - end)
+            output = bayesian_net(input)
+            loss = criterion(output, target)
 
-        input = input.cuda(args.gpu, non_blocking=True)
-        target = target.cuda(args.gpu, non_blocking=True)
-
-        output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]))
-        loss = criterion(output[:bs], target)
-
-        optimizer.zero_grad()
-        var_optimizer.zero_grad()
-        (loss+rank_loss*args.alpha).backward()
-        optimizer.step()
-        var_optimizer.step()
-    '''
+            mu_optimizer.zero_grad()
+            psi_optimizer.zero_grad()
+            loss.backward()
+            mu_optimizer.step()
+            psi_optimizer.step()
     
     
