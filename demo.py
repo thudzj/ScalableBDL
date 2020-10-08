@@ -3,7 +3,7 @@ from tqdm import tqdm
 import torch
 from converter import to_bayesian, to_deterministic
 from utils import freeze, unfreeze
-from optimizers import psi_opt
+from optimizers import PsiSGD
 
 import sys
 sys.path.insert(0, './reproduction')
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     print(len(mus), len(psis))
     mu_optimizer = torch.optim.SGD([{'params': mus, 'weight_decay': 2e-4}], 
                 lr=0.1, momentum=0.9, nesterov=True)
-    psi_optimizer = psi_opt([{'params': psis, 'weight_decay': 2e-4}],
+    psi_optimizer = PsiSGD([{'params': psis, 'weight_decay': 2e-4}],
                 lr=0.1, momentum=0.9, nesterov=True, num_data=50000)
 
     criterion = torch.nn.CrossEntropyLoss().cuda()
