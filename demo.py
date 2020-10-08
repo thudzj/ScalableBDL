@@ -52,8 +52,9 @@ if __name__ == '__main__':
             mu_optimizer.zero_grad()
             psi_optimizer.zero_grad()
             loss.backward()
-            print("Epoch {}, ite {}/{}, loss {}".format(epoch, i, 
-                len(train_loader), loss.item()))
+            if i % 100 == 0:
+                print("Epoch {}, ite {}/{}, loss {}".format(epoch, i, 
+                    len(train_loader), loss.item()))
             mu_optimizer.step()
             psi_optimizer.step()
     
