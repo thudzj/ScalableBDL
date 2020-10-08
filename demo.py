@@ -28,7 +28,7 @@ if __name__ == '__main__':
     args.data_path = './data'
     args.cutout = True
     args.distributed = False
-    args.batch_size = 64
+    args.batch_size = 4
     args.workers = 4
     train_loader, test_loader = load_dataset(args)
 
@@ -37,14 +37,16 @@ if __name__ == '__main__':
 
     mus, psis = [], []
     for name, param in bayesian_net.named_parameters():
-        if 'psi' in name: psis.append(param)
-        else: assert(param.requires_grad); mus.append(param)
-    print(len(mus), len(psis))
+        if 'psi' in name: 
+            psis.append(param)
+        else: 
+            mus.append(param)
     mu_optimizer = torch.optim.SGD([{'params': mus, 'weight_decay': 2e-4}], 
                 lr=0.1, momentum=0.9, nesterov=True)
     psi_optimizer = PsiSGD([{'params': psis, 'weight_decay': 2e-4}],
                 lr=0.1, momentum=0.9, nesterov=True, num_data=50000)
 
+    bayesian_net.train()
     criterion = torch.nn.CrossEntropyLoss().cuda()
     for epoch in range(args.epochs):
         for i, (input, target) in enumerate(train_loader):
