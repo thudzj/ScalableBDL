@@ -1,6 +1,9 @@
 ## Reproduce the results in our paper
 
-At first, execute `pip install git+https://github.com/thudzj/ScalableBDL.git`
+Refer to [BayesAdapter](https://github.com/thudzj/BayesAdapter/tree/prac) for the original implementation of BayesAdapter.
+
+
+If you want to implement BayesAdapter given this library, at first, execute `pip install git+https://github.com/thudzj/ScalableBDL.git`
 
 ### Dependencies
 + bcolz
