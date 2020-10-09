@@ -333,7 +333,7 @@ def evaluate(val_loaders, fake_loader, net,
     net.apply(unfreeze)
 
     if args.gpu == 0:
-        print("-----------------ensemble {} times-----------------".format(nums2))
+        print("-----------------ensemble {} times-----------------".format(num_mc_samples2))
     rets = ens_validate(val_loaders, net, criterion, args, log, num_mc_samples2)
 
     ens_attack(val_loaders, net, criterion, args, log, num_mc_samples, min(num_mc_samples, 8))

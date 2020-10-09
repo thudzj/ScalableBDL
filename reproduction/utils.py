@@ -54,8 +54,8 @@ def dist_collect(x):
     dist.all_gather(out_list, x)
     return torch.cat(out_list, dim=0)
 
-def print_log(print_string, log):
-    if log[1] == 0:
+def print_log(print_string, log, force=False):
+    if log[1] == 0 or force:
         print("{}".format(print_string))
         log[0].write('{}\n'.format(print_string))
         log[0].flush()
