@@ -151,10 +151,10 @@ def load_dataset_ft(args, INPUT_SIZE=[112, 112],
             WeightedRandomSampler(weights, len(weights)))
     else:
         ood_train_sampler = WeightedRandomSampler(weights, len(weights))
-
     ood_train_loader = torch.utils.data.DataLoader(
         ood_train_data, batch_size=args.batch_size//4, shuffle=(ood_train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=ood_train_sampler)
+
 
     val_transform = transforms.Compose([
         transforms.ToPILImage(),
@@ -175,7 +175,7 @@ def load_dataset_ft(args, INPUT_SIZE=[112, 112],
         val_loaders.append((name, val_loader, issame))
 
     fake_data = dset.ImageFolder(
-        os.path.join(args.data_path_fake, "val_3")
+        os.path.join(args.data_path_fake, "val_3"),
         transforms.Compose([
             transforms.Resize(int(128 * INPUT_SIZE[0] / 112)),
             transforms.ToTensor(),
