@@ -99,6 +99,14 @@ for epoch in range(args.epochs):
 **Check [this](https://github.com/thudzj/ScalableBDL/blob/master/demo.py) for a complete and runnable script.**
 
 
+## Comparison on predictive performance
+We compare the predictive performance between the fine-tuning start point (*DNN*) and the obtained *BNN* in the following table. Note that we perform *Bayes ensemble* with 100 MC samples for estimating the accuracy of *BNN*.
+
+|CIFAR-10 (wide-ResNet-28-10)|ImageNet (ResNet-50)
+--|:--:|--:
+*DNN*|96.92%|76.13%
+*BNN*|**97.09%**|**76.49%**
+
 ## Thanks to
 * @Harry24k [github:bayesian-neural-network-pytorch](https://github.com/Harry24k/bayesian-neural-network-pytorch)
 
