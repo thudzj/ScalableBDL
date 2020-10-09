@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 install_requires = [
-    'torch>=1.4.0',
+    'torch>=1.3.0',
 ]
 
 setup(
