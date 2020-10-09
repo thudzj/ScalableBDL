@@ -257,8 +257,8 @@ def main_worker(gpu, ngpus_per_node, args):
         epoch_time.update(time.time() - start_time)
         start_time = time.time()
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
-
-    evaluate(val_loaders, fake_loader, net, criterion, args, log, 20, 100)
+    while True:
+        evaluate(val_loaders, fake_loader, net, criterion, args, log, 20, 100)
 
     log[0].close()
 
@@ -342,7 +342,7 @@ def evaluate(val_loaders, fake_loader, net,
             print_log('{} vs. adversarial: AP {}'.format(k[0],
                 plot_mi(args.save_path, 'adv_'+k[0], k[0])), log)
 
-    ens_validate(fake_loader, net, criterion, args, log, num_mc_samples, suffix='_fake')
+    ens_validate(fake_loader, net, criterion, args, log, num_mc_samples, suffix='fake')
     if args.gpu == 0:
         for k in val_loaders:
             print_log('{} vs. DeepFake: AP {}'.format(k[0],
@@ -381,7 +381,7 @@ def ens_validate(val_loaders, model, criterion, args, log, num_ens=100, suffix='
     mis = (- preds * preds.log()).sum(1) - (0 if num_ens == 1 else torch.cat(mis, 0))
     if (isinstance(val_loaders, list) and args.gpu < len(val_loaders)) or \
                     ((not isinstance(val_loaders, list)) and args.gpu == 0):
-        np.save(os.path.join(args.save_path, 'mis{}.npy'.format(name)), mis.data.cpu().numpy())
+        np.save(os.path.join(args.save_path, 'mis_{}.npy'.format(name)), mis.data.cpu().numpy())
     if issame is not None:
         tpr, fpr, accuracy, best_thresholds = verify(embeddings, issame, 10)
         print_log('  **Test** {}: {:.3f}'.format(name, accuracy.mean()), log, True)
@@ -433,9 +433,6 @@ def ens_attack(val_loaders, model, criterion, args, log, num_ens=20, num_ens_a=8
     std = torch.from_numpy(np.array([0.5, 0.5, 0.5])).view(1,3,1,1).cuda(args.gpu).float()
 
     model.eval()
-    if args.dropout_rate > 0.:
-        for m in model.modules():
-            if m.__class__.__name__.startswith('Dropout'): m.train()
     name, val_loader, issame = val_loaders[args.gpu % len(val_loaders)]
     with torch.no_grad():
         with model.no_sync():

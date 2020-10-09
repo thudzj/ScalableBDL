@@ -261,8 +261,9 @@ def main_worker(gpu, ngpus_per_node, args):
         start_time = time.time()
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
 
-    evaluate(test_loader, adv_loader, fake_loader,
-             adv_loader2, net, criterion, args, log, 20, 100)
+    while True:
+        evaluate(test_loader, adv_loader, fake_loader,
+                 adv_loader2, net, criterion, args, log, 20, 100)
 
     log[0].close()
 
