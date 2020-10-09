@@ -1,3 +1,4 @@
+import torch
 from .mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
 
 def freeze(m):
@@ -26,7 +27,7 @@ def Bayes_ensemble(loader, model, loss_metric=torch.nn.functional.cross_entropy,
             for j in range(num_mc_samples):
                 output += model(input).softmax(-1)
             output /= num_mc_samples
-            total_loss += loss_metric(output, target).item()
+            total_loss += loss_metric(output.log(), target).item()
             total_acc += acc_metric(output, target).item()
         total_loss /= len(loader)
         total_acc /= len(loader)
