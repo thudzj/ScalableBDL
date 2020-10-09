@@ -7,7 +7,6 @@ import torch.nn as nn
 from torch.nn import Linear, Conv2d, BatchNorm2d
 
 from mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
-from utils import freeze, unfreeze
 
 def to_bayesian(input, psi_init_range=[-6, -5]):
     return _to_bayesian(copy.deepcopy(input), psi_init_range)
@@ -18,13 +17,13 @@ def _to_bayesian(input, psi_init_range=[-6, -5]):
         if isinstance(input, (Linear)):
             output = BayesLinearMF(input.in_features, input.out_features, input.bias)
         elif isinstance(input, (Conv2d)):
-            output = BayesConv2dMF(input.in_channels, input.out_channels, 
-                                   input.kernel_size, input.stride, 
-                                   input.padding, input.dilation, 
+            output = BayesConv2dMF(input.in_channels, input.out_channels,
+                                   input.kernel_size, input.stride,
+                                   input.padding, input.dilation,
                                    input.groups, input.bias)
         else:
-            output = BayesBatchNorm2dMF(input.num_features, input.eps, 
-                                        input.momentum, input.affine, 
+            output = BayesBatchNorm2dMF(input.num_features, input.eps,
+                                        input.momentum, input.affine,
                                         input.track_running_stats)
             setattr(output, 'running_mean', getattr(input, 'running_mean'))
             setattr(output, 'running_var', getattr(input, 'running_var'))
@@ -54,13 +53,13 @@ def _to_deterministic(input):
         if isinstance(input, (BayesLinearMF)):
             output = Linear(input.in_features, input.out_features, input.bias)
         elif isinstance(input, (BayesConv2dMF)):
-            output = Conv2d(input.in_channels, input.out_channels, 
-                            input.kernel_size, input.stride, 
-                            input.padding, input.dilation, 
+            output = Conv2d(input.in_channels, input.out_channels,
+                            input.kernel_size, input.stride,
+                            input.padding, input.dilation,
                             input.groups, input.bias)
         else:
-            output = BatchNorm2d(input.num_features, input.eps, 
-                                 input.momentum, input.affine, 
+            output = BatchNorm2d(input.num_features, input.eps,
+                                 input.momentum, input.affine,
                                  input.track_running_stats)
             setattr(output, 'running_mean', getattr(input, 'running_mean'))
             setattr(output, 'running_var', getattr(input, 'running_var'))
@@ -73,4 +72,3 @@ def _to_deterministic(input):
         for name, module in input.named_children():
             setattr(input, name, to_deterministic(module))
         return input
-

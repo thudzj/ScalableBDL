@@ -46,35 +46,35 @@ def load_dataset(args):
 
     if args.dataset == 'cifar10' or args.dataset == 'cifar100':
         train_transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(), 
-            transforms.RandomCrop(32, padding=4), 
-            transforms.ToTensor(), 
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, padding=4),
+            transforms.ToTensor(),
             transforms.Normalize(mean, std)
         ])
-        if args.cutout: 
+        if args.cutout:
             train_transform.transforms.append(Cutout(n_holes=1, length=16))
-        
+
         test_transform = transforms.Compose([
-            transforms.ToTensor(), 
+            transforms.ToTensor(),
             transforms.Normalize(mean, std)
         ])
 
-        train_data = dataset(args.data_path, train=True, 
+        train_data = dataset(args.data_path, train=True,
                              transform=train_transform, download=True)
-        test_data = dataset(args.data_path, train=False, 
+        test_data = dataset(args.data_path, train=False,
                             transform=test_transform, download=True)
 
         train_sampler = DistributedSampler(train_data) if args.distributed else None
         test_sampler = DistributedSampler(test_data) if args.distributed else None
 
-        train_loader = torch.utils.data.DataLoader(train_data, 
-            batch_size=args.batch_size, shuffle=(train_sampler is None), 
+        train_loader = torch.utils.data.DataLoader(train_data,
+            batch_size=args.batch_size, shuffle=(train_sampler is None),
             num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-        test_loader = torch.utils.data.DataLoader(test_data, 
+        test_loader = torch.utils.data.DataLoader(test_data,
             batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, sampler=test_sampler)
 
-    else: 
+    else:
         assert False, 'Do not support dataset : {}'.format(args.dataset)
 
     return train_loader, test_loader
@@ -82,19 +82,19 @@ def load_dataset(args):
 class OODData:
     def __init__(self, args, transform_last=None):
         super(OODData, self).__init__()
-        self.adv_eps = args.epsilon * args.epsilon_scale
+        self.adv_eps = args.epsilon
         self.transform_last = transform_last
         self.num_fake = args.num_fake
         self.cutout = Cutout(n_holes=1, length=16) if args.cutout else None
-        if args.dataset == 'cifar10': 
+        if args.dataset == 'cifar10':
             dataset = dset.CIFAR10
-        elif args.dataset == 'cifar100': 
+        elif args.dataset == 'cifar100':
             dataset = dset.CIFAR100
-        else: 
+        else:
             raise NotImplementedError
         self.normal_data = dataset(args.data_path, train=True, download=True,
             transform=transforms.Compose([
-               transforms.RandomCrop(32, padding=4), 
+               transforms.RandomCrop(32, padding=4),
                transforms.RandomHorizontalFlip(),
                transforms.ToTensor()
             ]))
@@ -114,7 +114,7 @@ class OODData:
         choice = np.random.choice(2)
         if choice == 0: # add uniform noise
             img, _ = self.normal_data[index]
-            img = torch.empty_like(img).uniform_(-self.adv_eps, 
+            img = torch.empty_like(img).uniform_(-self.adv_eps,
                 self.adv_eps).add_(img).clamp_(0, 1)
         elif choice == 1: # fake
             rand_idx = np.random.randint(self.num_fake)
@@ -141,54 +141,54 @@ def load_dataset_ft(args):
 
     if args.dataset == 'cifar10' or args.dataset == 'cifar100':
         train_transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(), 
-            transforms.RandomCrop(32, padding=4), 
-            transforms.ToTensor(), 
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, padding=4),
+            transforms.ToTensor(),
             transforms.Normalize(mean, std)
         ])
-        if args.cutout: 
+        if args.cutout:
             train_transform.transforms.append(Cutout(n_holes=1, length=16))
-        train_data = dataset(args.data_path, train=True, 
+        train_data = dataset(args.data_path, train=True,
                              transform=train_transform, download=True)
         train_sampler = DistributedSampler(train_data) if args.distributed else None
-        train_loader = torch.utils.data.DataLoader(train_data, 
-            batch_size=args.batch_size//2, shuffle=(train_sampler is None), 
+        train_loader = torch.utils.data.DataLoader(train_data,
+            batch_size=args.batch_size//2, shuffle=(train_sampler is None),
             num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
         ood_train_data = OODData(args, transform_last=transforms.Normalize(mean, std))
         ood_train_sampler = DistributedSampler(ood_train_data) if args.distributed else None
-        ood_train_loader = torch.utils.data.DataLoader(ood_train_data, 
-            batch_size=args.batch_size//4, shuffle=(ood_train_sampler is None), 
+        ood_train_loader = torch.utils.data.DataLoader(ood_train_data,
+            batch_size=args.batch_size//4, shuffle=(ood_train_sampler is None),
             num_workers=args.workers, pin_memory=True, sampler=ood_train_sampler)
 
         test_transform = transforms.Compose([
-            transforms.ToTensor(), 
+            transforms.ToTensor(),
             transforms.Normalize(mean, std)
         ])
-        test_data = dataset(args.data_path, train=False, 
+        test_data = dataset(args.data_path, train=False,
                             transform=test_transform, download=True)
         test_sampler = DistributedSampler(test_data) if args.distributed else None
-        test_loader = torch.utils.data.DataLoader(test_data, 
-            batch_size=args.batch_size, shuffle=False, 
+        test_loader = torch.utils.data.DataLoader(test_data,
+            batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, sampler=test_sampler)
 
         adv_sampler = DistributedSampler(test_data) if args.distributed else None
-        adv_loader = torch.utils.data.DataLoader(test_data, 
-            batch_size=args.batch_size//2, shuffle=False, 
+        adv_loader = torch.utils.data.DataLoader(test_data,
+            batch_size=args.batch_size//2, shuffle=False,
             num_workers=args.workers, pin_memory=True, sampler=adv_sampler)
 
-        fake_dataset = dset.ImageFolder(os.path.join(args.data_path_fake, 'val'), 
+        fake_dataset = dset.ImageFolder(os.path.join(args.data_path_fake, 'val'),
                                         test_transform)
         fake_sampler = DistributedSampler(fake_dataset) if args.distributed else None
-        fake_loader = torch.utils.data.DataLoader(fake_dataset, 
-            batch_size=args.batch_size, shuffle=False, 
+        fake_loader = torch.utils.data.DataLoader(fake_dataset,
+            batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, sampler=fake_sampler)
 
-        fake_dataset2 = dset.ImageFolder(os.path.join(args.data_path_fake, 'val_extra'), 
+        fake_dataset2 = dset.ImageFolder(os.path.join(args.data_path_fake, 'val_extra'),
                                          test_transform)
         fake_sampler2 = DistributedSampler(fake_dataset2) if args.distributed else None
-        fake_loader2 = torch.utils.data.DataLoader(fake_dataset2, 
-            batch_size=args.batch_size, shuffle=False, 
+        fake_loader2 = torch.utils.data.DataLoader(fake_dataset2,
+            batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, sampler=fake_sampler2)
 
     else: assert False, 'Do not support dataset : {}'.format(args.dataset)

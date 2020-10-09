@@ -1,4 +1,5 @@
 import torch
+import torch.distributed as dist
 import os, sys, time
 import numpy as np
 import pandas as pd
@@ -16,6 +17,55 @@ from sklearn import metrics
 
 def ent(p):
     return -(p*p.log()).sum(-1)
+
+def accuracy(output, target, topk=(1,)):
+    if len(target.shape) > 1: return torch.tensor(1), torch.tensor(1)
+
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+    return res
+
+def reduce_tensor(tensor, args):
+    rt = tensor.clone()
+    dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+    rt /= args.world_size
+    return rt
+
+def dist_collect(x):
+    """ collect all tensor from all GPUs
+    args:
+        x: shape (mini_batch, ...)
+    returns:
+        shape (mini_batch * num_gpu, ...)
+    """
+    x = x.contiguous()
+    out_list = [torch.zeros_like(x, device=x.device, dtype=x.dtype)
+                for _ in range(dist.get_world_size())]
+    dist.all_gather(out_list, x)
+    return torch.cat(out_list, dim=0)
+
+def print_log(print_string, log):
+    if log[1] == 0:
+        print("{}".format(print_string))
+        log[0].write('{}\n'.format(print_string))
+        log[0].flush()
+
+def save_checkpoint(state, is_best, save_path, filename):
+    filename = os.path.join(save_path, filename)
+    torch.save(state, filename)
+    if is_best:
+        bestname = os.path.join(save_path, 'model_best.pth.tar')
+        shutil.copyfile(filename, bestname)
 
 class _ECELoss(torch.nn.Module):
     def __init__(self, n_bins=15):
@@ -231,7 +281,7 @@ def plot_mi(dir_, type_, type2_=None):
     plt.xlabel('Mutual information')#, fontsize=20)
     plt.ylabel('Density')#, fontsize=20)
     plt.tight_layout()
-    plt.savefig(os.path.join(dir_, '{}_vs_{}.pdf'.format('nat' 
+    plt.savefig(os.path.join(dir_, '{}_vs_{}.pdf'.format('nat'
         if type2_ is None else type2_, type_)), bbox_inches='tight')
     return ap
 
@@ -247,7 +297,7 @@ def plot_ens(dir_, rets, baseline_acc):
     fig, ax1 = plt.subplots(figsize=(4,3))
     l1 = ax1.plot(rets[:, 0]+1, rets[:, 2], color=color[0], lw=lw, alpha=0.6)
     l2 = ax1.plot(rets[:, 0]+1, rets[:, 6], color=color[1], lw=lw)
-    l3 = ax1.plot(rets[:, 0]+1, np.ones(rets.shape[0])*baseline_acc, 
+    l3 = ax1.plot(rets[:, 0]+1, np.ones(rets.shape[0])*baseline_acc,
         color=color[2], lw=lw, alpha=0.6, linestyle='dashed')
     ax1.set_yticks(np.arange(1, 101, 1))
     ax1.set_xticks([1,] + list(np.arange(20, rets.shape[0]+1, 20)))
@@ -255,10 +305,10 @@ def plot_ens(dir_, rets, baseline_acc):
     ax1.set_xlim((1, rets.shape[0]))
     ax1.set_xlabel('The number of MC sample')
     ax1.set_ylabel('Test accuracy (%)')
-    ax1.legend(l1+l2+l3, ['Individual', 'Ensemble', 'Deterministic'], 
-        loc = 'best', fancybox=True, columnspacing=0.5, handletextpad=0.2, 
+    ax1.legend(l1+l2+l3, ['Individual', 'Ensemble', 'Deterministic'],
+        loc = 'best', fancybox=True, columnspacing=0.5, handletextpad=0.2,
         borderpad=0.15) # +l3+l4 , 'Indiv ECE', 'Ensemble ECE'  , fontsize=11
-    plt.savefig(os.path.join(dir_, 'ens_plot.pdf'), format='pdf', 
+    plt.savefig(os.path.join(dir_, 'ens_plot.pdf'), format='pdf',
         dpi=600, bbox_inches='tight')
 
 
@@ -408,5 +458,3 @@ def verify(embeddings, actual_issame, nrof_folds = 10, pca = 0):
 #                                       np.asarray(actual_issame), 1e-3, nrof_folds=nrof_folds)
 #     return tpr, fpr, accuracy, best_thresholds, val, val_std, far
     return tpr, fpr, accuracy, best_thresholds
-
-

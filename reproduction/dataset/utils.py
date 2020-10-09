@@ -1,3 +1,4 @@
+import numpy as np
 from random import random, choice
 from scipy.ndimage.filters import gaussian_filter
 import cv2
