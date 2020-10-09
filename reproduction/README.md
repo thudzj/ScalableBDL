@@ -1,6 +1,6 @@
-## Reproduce the results in our paper
+## Reproduce the results in [our paper](https://arxiv.org/pdf/2010.01979.pdf)
 
-Refer to [BayesAdapter](https://github.com/thudzj/BayesAdapter/tree/prac) for the original implementation of BayesAdapter.
+Refer to [BayesAdapter](https://github.com/thudzj/BayesAdapter/tree/prac) for the original implementation.
 
 
 If you want to implement BayesAdapter given this library, at first, execute `pip install git+https://github.com/thudzj/ScalableBDL.git`
