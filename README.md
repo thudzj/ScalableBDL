@@ -6,7 +6,7 @@ We provide a Pytorch implementation to learn Bayesian Neural Networks (BNNs) at 
 For *deterministic pre-training*, we just train a regular DNN via *maximum a posteriori* (MAP) estimation, which is realised by performing SGD under weight decay regularizor. We can also reuse off-the-shelf pre-trained models from popular model zoos (e.g., [PyTorch Hub](https://pytorch.org/hub/)).
 
 
-After *deterministic pre-training*, it is straight forward to convert the converged DNN into a BNN, and then perform *Bayesian fine-tuning* given this library, which enables us to fine-tune the BNN as if one were fine-tuning a regular DNN.
+After *deterministic pre-training*, it is straight forward to convert the converged DNN into a BNN and to perform *Bayesian fine-tuning* given this library.
 
 The current implementation only considers using mean-field Gaussian as approximate posterior, and more flexible distributions are under development.
 
@@ -70,7 +70,7 @@ psi_optimizer = PsiSGD(psis, lr=0.1, momentum=0.9,
 The optimizer for `psi` takes one more argument `num_data`, which equals to the size of the training dataset.
 
 
-After the preparation, we perform *Bayesian fine-tuning* just like training a regular DNN, expect that our optimization involves two optimizers:
+After the preparation, we perform *Bayesian fine-tuning* just like fine-tuning a regular DNN, expect that our optimization involves two optimizers:
 ```python
 for epoch in range(args.epochs):
     bayesian_net.train()
