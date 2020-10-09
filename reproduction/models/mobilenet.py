@@ -6,7 +6,7 @@ __all__ = ['MobileNetV2', 'mobilenet_v2']
 
 
 model_urls = {
-    'mobilenet_v2': 'https://download.pytorch.org/models/mobilenet_v2-b0353104.pth',
+    'mobilenet_v2-10341': 'http://ml.cs.tsinghua.edu.cn/~zhijie/files/mobilenet_v2-face-10341.pth',
 }
 
 
@@ -182,7 +182,8 @@ def mobilenet_v2(pretrained=False, progress=True, **kwargs):
     """
     model = MobileNetV2(**kwargs)
     if pretrained:
-        state_dict = load_state_dict_from_url(model_urls['mobilenet_v2'],
+        state_dict = load_state_dict_from_url(model_urls['mobilenet_v2-{}'.format(
+                                                kwargs[num_classes])],
                                               progress=progress)
         model.load_state_dict(state_dict)
     return model

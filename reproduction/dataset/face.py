@@ -80,7 +80,7 @@ def load_dataset(args, INPUT_SIZE=[112, 112],
 class OODData:
     def __init__(self, args, INPUT_SIZE, transform_last=None):
         super(OODData, self).__init__()
-        self.eps = args.epsilon * args.epsilon_scale
+        self.eps = args.epsilon * 0.25
         self.transform_last = transform_last
         self.num_fake = args.num_fake
 

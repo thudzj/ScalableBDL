@@ -21,8 +21,7 @@ from utils import AverageMeter, RecorderMeter, time_string, \
     convert_secs2time, _ECELoss, plot_mi, plot_ens, ent, accuracy, \
     reduce_tensor, dist_collect, print_log, save_checkpoint
 from dataset.imagenet import load_dataset_ft
-import models
-from finetune_cifar import train, ens_validate, ens_attack, adjust_learning_rate
+import models.resnet as models
 
 parser = argparse.ArgumentParser(description='Training script for ImageNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -360,5 +359,165 @@ def evaluate(test_loader, adv_loader, fake_loader, adv_loader2, net,
     if args.gpu == 0:
         print_log('NAT vs. FGSM-ResNet152: AP {}'.format(plot_mi(args.save_path, 'adv')), log)
     return rets[-1][-3], rets[-1][-4]
+
+
+def ens_validate(val_loader, model, criterion, args, log, num_mc_samples=20, suffix=''):
+    model.eval()
+
+    ece_func = _ECELoss().cuda(args.gpu)
+    with torch.no_grad():
+        targets = []
+        mis = [0 for _ in range(len(val_loader))]
+        preds = [0 for _ in range(len(val_loader))]
+        rets = torch.zeros(num_mc_samples, 9).cuda(args.gpu)
+        for i, (input, target) in enumerate(val_loader):
+            input = input.cuda(args.gpu, non_blocking=True)
+            target = target.cuda(args.gpu, non_blocking=True)
+            targets.append(target)
+            for ens in range(num_mc_samples):
+                output = model(input)
+
+                one_loss = criterion(output, target)
+                one_prec1, one_prec5 = accuracy(output, target, topk=(1, 5))
+
+                mis[i] = (mis[i] * ens + (-output.softmax(-1) *
+                    output.log_softmax(-1)).sum(1)) / (ens + 1)
+                preds[i] = (preds[i] * ens + output.softmax(-1)) / (ens + 1)
+
+                loss = criterion(preds[i].log(), target)
+                prec1, prec5 = accuracy(preds[i], target, topk=(1, 5))
+
+                rets[ens, 0] += ens*target.size(0)
+                rets[ens, 1] += one_loss.item()*target.size(0)
+                rets[ens, 2] += one_prec1.item()*target.size(0)
+                rets[ens, 3] += one_prec5.item()*target.size(0)
+                rets[ens, 5] += loss.item()*target.size(0)
+                rets[ens, 6] += prec1.item()*target.size(0)
+                rets[ens, 7] += prec5.item()*target.size(0)
+
+        preds = torch.cat(preds, 0)
+
+        # to sync
+        confidences, predictions = torch.max(preds, 1)
+        targets = torch.cat(targets, 0)
+        mis = (- preds * preds.log()).sum(1) - torch.cat(mis, 0)
+        rets /= targets.size(0)
+
+        if args.distributed:
+            if suffix == '':
+                confidences = dist_collect(confidences)
+                predictions = dist_collect(predictions)
+                targets = dist_collect(targets)
+            mis = dist_collect(mis)
+            rets = reduce_tensor(rets.data, args)
+        rets = rets.data.cpu().numpy()
+        if suffix == '':
+            ens_ece = ece_func(confidences, predictions, targets,
+                os.path.join(args.save_path, 'ens_cal{}.pdf'.format(suffix)))
+            rets[-1, -1] = ens_ece
+
+    if args.gpu == 0:
+        np.save(os.path.join(args.save_path, 'mis{}.npy'.format(suffix)),
+            mis.data.cpu().numpy())
+    return rets
+
+def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
+    def _grad(X, y, mean, std):
+        probs = torch.zeros(num_mc_samples, X.shape[0]).cuda(args.gpu)
+        grads = torch.zeros(num_mc_samples, *list(X.shape)).cuda(args.gpu)
+        for j in range(num_mc_samples):
+            with model.no_sync():
+                with torch.enable_grad():
+                    X.requires_grad_()
+                    output = model(X.sub(mean).div(std))
+                    loss = torch.nn.functional.cross_entropy(output, y, reduction='none')
+                    grad_ = torch.autograd.grad(
+                        [loss], [X], grad_outputs=torch.ones_like(loss),
+                        retain_graph=False)[0].detach()
+            grads[j] = grad_
+            probs[j] = torch.gather(output.detach().softmax(-1), 1, y[:,None]).squeeze()
+        probs /= probs.sum(0)
+        grad_ = (grads * probs[:, :, None, None, None]).sum(0)
+        return grad_
+
+    def _pgd_whitebox(X, y, mean, std):
+        X_pgd = X.clone()
+        if args.random:
+            X_pgd += torch.cuda.FloatTensor(*X_pgd.shape).uniform_(-args.epsilon, args.epsilon)
+
+        for _ in range(args.num_steps):
+            grad_ = _grad(X_pgd, y, mean, std)
+            X_pgd += args.step_size * grad_.sign()
+            eta = torch.clamp(X_pgd - X, -args.epsilon, args.epsilon)
+            X_pgd = torch.clamp(X + eta, 0, 1.0)
+
+        mis = 0
+        preds = 0
+        for ens in range(num_mc_samples):
+            output = model(X_pgd.sub(mean).div(std))
+            mis = (mis * ens + (-output.softmax(-1) * (output).log_softmax(-1)).sum(1)) / (ens + 1)
+            preds = (preds * ens + output.softmax(-1)) / (ens + 1)
+
+        loss = criterion((preds+1e-8).log(), target)
+        prec1, prec5 = accuracy(preds, target, topk=(1, 5))
+        mis = (- preds * (preds+1e-8).log()).sum(1) - mis
+        return loss, prec1, prec5, mis
+
+    if args.dataset == 'cifar10':
+        mean = torch.from_numpy(np.array([x / 255
+            for x in [125.3, 123.0, 113.9]])).view(1,3,1,1).cuda(args.gpu).float()
+        std = torch.from_numpy(np.array([x / 255
+            for x in [63.0, 62.1, 66.7]])).view(1,3,1,1).cuda(args.gpu).float()
+    elif args.dataset == 'cifar100':
+        mean = torch.from_numpy(np.array([x / 255
+            for x in [129.3, 124.1, 112.4]])).view(1,3,1,1).cuda(args.gpu).float()
+        std = torch.from_numpy(np.array([x / 255
+            for x in [68.2, 65.4, 70.4]])).view(1,3,1,1).cuda(args.gpu).float()
+    elif args.dataset == 'imagenet':
+        mean = torch.from_numpy(np.array(
+            [0.485, 0.456, 0.406])).view(1,3,1,1).cuda(args.gpu).float()
+        std = torch.from_numpy(np.array(
+            [0.229, 0.224, 0.225])).view(1,3,1,1).cuda(args.gpu).float()
+
+    losses, top1, top5 = 0, 0, 0
+    model.eval()
+    with torch.no_grad():
+        mis = []
+        for i, (input, target) in enumerate(val_loader):
+            input = input.cuda(args.gpu, non_blocking=True).mul_(std).add_(mean)
+            target = target.cuda(args.gpu, non_blocking=True)
+            loss, prec1, prec5, mis_ = _pgd_whitebox(input, target, mean, std)
+            losses += loss * target.size(0)
+            top1 += prec1 * target.size(0)
+            top5 += prec5 * target.size(0)
+            mis.append(mis_)
+
+        mis = torch.cat(mis, 0)
+        losses /= mis.size(0)
+        top1 /= mis.size(0)
+        top5 /= mis.size(0)
+        losses = reduce_tensor(losses.data, args)
+        top1 = reduce_tensor(top1.data, args)
+        top5 = reduce_tensor(top5.data, args)
+
+        if args.distributed: mis = dist_collect(mis)
+
+    print_log('ADV ensemble TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f}'.format(
+        top1.item(), top5.item(), losses.item()), log)
+    if args.gpu == 0:
+        np.save(os.path.join(args.save_path, 'mis_advg.npy'), mis.data.cpu().numpy())
+
+def adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args):
+    lr = args.learning_rate
+    slr = args.learning_rate
+    assert len(args.gammas) == len(args.schedule), \
+        "length of gammas and schedule should be equal"
+    for (gamma, step) in zip(args.gammas, args.schedule):
+        if (epoch >= step): slr = slr * gamma
+        else: break
+    lr = lr * np.prod(args.gammas)
+    for param_group in mu_optimizer.param_groups: param_group['lr'] = lr
+    for param_group in psi_optimizer.param_groups: param_group['lr'] = slr
+    return lr, slr
 
 if __name__ == '__main__': main()
