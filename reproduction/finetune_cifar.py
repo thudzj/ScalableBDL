@@ -13,16 +13,15 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.utils.data.distributed
 
+from scalablebdl.mean_field import PsiSGD
+from scalablebdl.converter import to_bayesian, to_deterministic
+from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout
+
 from utils import AverageMeter, RecorderMeter, time_string, \
     convert_secs2time, _ECELoss, plot_mi, plot_ens, ent, accuracy, \
     reduce_tensor, dist_collect, print_log, save_checkpoint
 from dataset.cifar import load_dataset_ft
 from models.wrn import wrn
-
-sys.path.insert(0, '../')
-from mean_field import PsiSGD
-from converter import to_bayesian, to_deterministic
-from bnn_utils import freeze, unfreeze, disable_dropout
 
 parser = argparse.ArgumentParser(description='Training script for CIFAR', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -119,7 +118,6 @@ def main():
     args.save_path = args.save_path + job_id
     if not os.path.isdir(args.save_path): os.makedirs(args.save_path)
     args.num_classes = 10 if args.dataset == 'cifar10' else 100
-    args.num_data = 50000
 
     args.use_cuda = torch.cuda.is_available()
     if args.manualSeed is None: args.manualSeed = random.randint(1, 10000)
@@ -190,8 +188,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     psi_optimizer = PsiSGD(psis, args.learning_rate, args.momentum,
                            weight_decay=args.decay,
-                           nesterov=(args.momentum > 0.0),
-                           num_data=args.num_data)
+                           nesterov=(args.momentum > 0.0))
 
     recorder = RecorderMeter(args.epochs)
     if args.resume:
@@ -219,6 +216,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     train_loader, ood_train_loader, test_loader, adv_loader, \
         fake_loader, fake_loader2 = load_dataset_ft(args)
+    psi_optimizer.num_data = len(train_loader.dataset)
 
     if args.evaluate:
         evaluate(test_loader, adv_loader, fake_loader,
@@ -245,9 +243,8 @@ def main_worker(gpu, ngpus_per_node, args):
         train_acc, train_los = train(train_loader, ood_train_loader, net,
                                      criterion, mu_optimizer, psi_optimizer,
                                      epoch, args, log)
-        # val_acc, val_los = evaluate(test_loader, adv_loader, fake_loader,
-        #                             fake_loader2, net, criterion, args, log, 2, 2)
-        recorder.update(epoch, train_los, train_acc, 0, 0)
+        val_acc, val_los = 0, 0
+        recorder.update(epoch, train_los, train_acc, val_acc, val_los)
 
         is_best = False
         if val_acc > best_acc:

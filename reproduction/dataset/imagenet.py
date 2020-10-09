@@ -6,7 +6,7 @@ import torchvision.transforms as transforms
 from torch.utils.data.distributed import DistributedSampler
 from .utils import GeneratedDataAugment
 
-def load_dataset_in(args):
+def load_dataset(args):
     traindir = os.path.join(args.data_path, 'train')
     valdir = os.path.join(args.data_path, 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -48,11 +48,11 @@ def load_dataset_in(args):
 class OODData:
     def __init__(self, args, transform_last=None):
         super(OODData, self).__init__()
-        self.eps = args.epsilon * args.epsilon_scale
+        self.eps = args.epsilon
         self.transform_last = transform_last
         self.num_fake = args.num_fake
 
-        self.normal_data = dset.ImageFolder(os.path.join(args.data_path, 'train'), 
+        self.normal_data = dset.ImageFolder(os.path.join(args.data_path, 'train'),
             transforms.Compose([
                 transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
@@ -74,7 +74,7 @@ class OODData:
         choice = np.random.choice(2)
         if choice == 0: # add uniform noise
             img, _ = self.normal_data[index]
-            img = torch.empty_like(img).uniform_(-self.eps, 
+            img = torch.empty_like(img).uniform_(-self.eps,
                 self.eps).add_(img).clamp_(0, 1)
         elif choice == 1: # fake
             rand_idx = np.random.randint(self.num_fake)
@@ -87,7 +87,7 @@ class OODData:
     def __len__(self):
         return len(self.normal_data)
 
-def load_dataset_in_ft(args):
+def load_dataset_ft(args):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 

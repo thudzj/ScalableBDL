@@ -34,7 +34,7 @@ class TensorsDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.data_tensor.size(0)
 
-def load_dataset_face(args, INPUT_SIZE=[112, 112],
+def load_dataset(args, INPUT_SIZE=[112, 112],
                       RGB_MEAN = [0.5, 0.5, 0.5], RGB_STD = [0.5, 0.5, 0.5],
                       val_datasets=['lfw', 'cfp_ff', 'cfp_fp', 'agedb_30', 'calfw', 'cplfw', 'vgg2_fp']):
     train_transform = transforms.Compose([
@@ -84,7 +84,7 @@ class OODData:
         self.transform_last = transform_last
         self.num_fake = args.num_fake
 
-        self.normal_data = dset.ImageFolder(os.path.join(args.data_path, 'CASIA-maxpy-align'), 
+        self.normal_data = dset.ImageFolder(os.path.join(args.data_path, 'CASIA-maxpy-align'),
             transforms.Compose([
                 transforms.Resize([int(128 * INPUT_SIZE[0] / 112), int(128 * INPUT_SIZE[0] / 112)]),
                 transforms.RandomCrop([INPUT_SIZE[0], INPUT_SIZE[1]]),
@@ -108,7 +108,7 @@ class OODData:
         choice = np.random.choice(2)
         if choice == 0: # add uniform noise
             img, _ = self.normal_data[index]
-            img = torch.empty_like(img).uniform_(-self.eps, 
+            img = torch.empty_like(img).uniform_(-self.eps,
                 self.eps).add_(img).clamp_(0, 1)
         elif choice == 1: # fake
             rand_idx = np.random.randint(self.num_fake)
@@ -121,7 +121,7 @@ class OODData:
     def __len__(self):
         return len(self.normal_data)
 
-def load_dataset_face_ft(args, INPUT_SIZE=[112, 112],
+def load_dataset_ft(args, INPUT_SIZE=[112, 112],
                       RGB_MEAN = [0.5, 0.5, 0.5], RGB_STD = [0.5, 0.5, 0.5],
                       val_datasets=['lfw', 'cfp_ff', 'cfp_fp', 'agedb_30', 'calfw', 'cplfw', 'vgg2_fp']):
     normalize = transforms.Normalize(mean = RGB_MEAN, std = RGB_STD)
