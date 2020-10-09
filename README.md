@@ -3,7 +3,7 @@
 We provide a Pytorch implementation to learn Bayesian Neural Networks (BNNs) at low cost. We unfold the learning of a BNN into two steps: *deterministic pre-training* of the deep neural network (DNN) counterpart of the BNN followed by *Bayesian fine-tuning*.
 
 
-For *deterministic pre-training*, we just train a regular DNN via *maximum a posteriori* (MAP) estimation, which is realised by performing SGD under weight decay regularizor. We can also reuse off-the-shelf pre-trained models from popular model zoos (e.g., [PyTorch Hub](https://pytorch.org/hub/)).
+For *deterministic pre-training*, we just train a regular DNN via *maximum a posteriori* (MAP) estimation, which is realised by conducting optimization under weight decay regularizor. We can also reuse off-the-shelf pre-trained models from popular model zoos (e.g., [PyTorch Hub](https://pytorch.org/hub/)).
 
 
 After *deterministic pre-training*, it is straight forward to convert the converged DNN into a BNN and to perform *Bayesian fine-tuning* given this library.
@@ -34,7 +34,7 @@ from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, Bayes_ensem
 from scalablebdl.mean_field import PsiSGD
 ```
 
-Then load the pre-trained wide-ResNet model, and disable the possible stochastic components inside the model:
+Then load the pre-trained wide-ResNet model, and disable the possible stochasticity inside the model:
 ```python
 net = wrn(pretrained=True, depth=28, width=10).cuda()
 disable_dropout(net)
@@ -67,7 +67,7 @@ psi_optimizer = PsiSGD(psis, lr=0.1, momentum=0.9,
                        num_data=50000)
 ```
 
-The optimizer for `psi` takes one more argument `num_data`, which equals to the size of the training dataset.
+The optimizer for `psi` takes one more argument `num_data`, which is the size of the training dataset.
 
 
 After the preparation, we perform *Bayesian fine-tuning* just like fine-tuning a regular DNN, expect that our optimization involves two optimizers:
