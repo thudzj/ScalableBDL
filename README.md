@@ -96,7 +96,7 @@ for epoch in range(args.epochs):
         epoch, eval_loss, eval_acc))
 ```
  
-** Check [this](https://github.com/thudzj/ScalableBDL/blob/master/demo.py) for a complete and runnable script. **
+**Check [this](https://github.com/thudzj/ScalableBDL/blob/master/demo.py) for a complete and runnable script.**
 
 
 ## Thanks to
