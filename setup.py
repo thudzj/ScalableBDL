@@ -1,4 +1,8 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+
+install_requires = [
+    'torch>=1.4.0',
+]
 
 setup(
     name='scalablebdl',
@@ -8,6 +12,14 @@ setup(
     author='Zhijie Deng',
     author_email='dzj17@mails.tsinghua.edu.cn',
     license='license.txt',
-    packages=['scalablebdl'],
-    zip_safe=False
+    packages=find_packages(),
+    include_package_data = True,
+    platforms = "any",
+    zip_safe=False,
+    package_data={
+        'scalablebdl': [
+            'mean_field/*'
+        ],
+    },
+
 )
