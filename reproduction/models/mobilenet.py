@@ -158,17 +158,19 @@ class MobileNetV2(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.zeros_(m.bias)
 
-    def _forward_impl(self, x):
+    def _forward_impl(self, x, return_both=False):
         # This exists since TorchScript doesn't support inheritance, so the superclass method
         # (this one) needs to have a name other than `forward` that can be accessed in a subclass
         x = self.features(x)
         # Cannot use "squeeze" as batch-size can be 1 => must use reshape with x.shape[0]
         x = nn.functional.adaptive_avg_pool2d(x, 1).reshape(x.shape[0], -1)
-        x = self.classifier(x)
-        return x
+        if return_both:
+            return x, self.classifier(x)
+        else:
+            return self.classifier(x)
 
-    def forward(self, x):
-        return self._forward_impl(x)
+    def forward(self, x, return_both=False):
+        return self._forward_impl(x, return_both)
 
 
 def mobilenet_v2(pretrained=False, progress=True, **kwargs):
