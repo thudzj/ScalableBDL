@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.nn import Linear, Conv2d, BatchNorm2d
 
-from mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
+from .mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
 
 def to_bayesian(input, psi_init_range=[-6, -5]):
     return _to_bayesian(copy.deepcopy(input), psi_init_range)
