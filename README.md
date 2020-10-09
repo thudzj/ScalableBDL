@@ -25,7 +25,7 @@ For more details, refer to [our paper](https://arxiv.org/pdf/2010.01979.pdf) and
 
 
 ### A fast trial
-With CIFAR-10 classification as an example, we leverage this library to perform *Bayesian fine-tuning* upon a pre-trained wide-ResNet-28-10 model, and to evaluate the resultant Bayesian posterior following the following procedure:
+With CIFAR-10 classification as an example, we can easily leverage this library to perform *Bayesian fine-tuning* upon a pre-trained wide-ResNet-28-10 model, and to evaluate the resultant Bayesian posterior.
 
 We first import the necessary modules for *Bayesian fine-tuning*:
 ```python
@@ -34,7 +34,7 @@ from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, Bayes_ensem
 from scalablebdl.mean_field import PsiSGD
 ```
 
-Then load the pre-trained wide-ResNet-28-10 model, and disable the possible stochastic components inside the model:
+Then load the pre-trained wide-ResNet model, and disable the possible stochastic components inside the model:
 ```python
 net = wrn(pretrained=True, depth=28, width=10).cuda()
 disable_dropout(net)
@@ -48,7 +48,7 @@ print('Results of deterministic pre-training, '
       'eval loss {}, eval acc {}'.format(eval_loss, eval_acc))
 ```
 
-To expand the point-estimate parameters into random variables, we only need to invoke
+To expand the point-estimate parameters into Bayesian variables, we only need to invoke
 ```python
 bayesian_net = to_bayesian(net)
 bayesian_net.apply(unfreeze)
@@ -67,10 +67,10 @@ psi_optimizer = PsiSGD(psis, lr=0.1, momentum=0.9,
                        num_data=50000)
 ```
 
-Note that the optimizer for `psi` takes one more argument `num_data`, which equals to the size of the training dataset.
+The optimizer for `psi` takes one more argument `num_data`, which equals to the size of the training dataset.
 
 
-After these preparation, we perform *Bayesian fine-tuning* just like training a regular DNN, expect that our optimization involves two optimizers:
+After the preparation, we perform *Bayesian fine-tuning* just like training a regular DNN, expect that our optimization involves two optimizers:
 ```python
 for epoch in range(args.epochs):
     bayesian_net.train()
@@ -96,7 +96,7 @@ for epoch in range(args.epochs):
         epoch, eval_loss, eval_acc))
 ```
  
-** Check [this](https://github.com/thudzj/ScalableBDL/blob/master/demo.py) for a complete and runnable script.**
+** Check [this](https://github.com/thudzj/ScalableBDL/blob/master/demo.py) for a complete and runnable script. **
 
 
 ## Thanks to
