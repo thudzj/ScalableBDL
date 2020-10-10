@@ -257,8 +257,7 @@ def main_worker(gpu, ngpus_per_node, args):
         epoch_time.update(time.time() - start_time)
         start_time = time.time()
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
-    while True:
-        evaluate(val_loaders, fake_loader, net, criterion, args, log, 20, 100)
+    evaluate(val_loaders, fake_loader, net, criterion, args, log, 20, 100)
 
     log[0].close()
 
