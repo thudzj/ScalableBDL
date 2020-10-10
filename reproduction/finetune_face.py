@@ -178,12 +178,10 @@ def main_worker(gpu, ngpus_per_node, args):
         if 'psi' in name: psis.append(param)
         else: mus.append(param)
     mu_optimizer = SGD(mus, args.learning_rate, args.momentum,
-                       weight_decay=args.decay,
-                       nesterov=(args.momentum > 0.0))
+                       weight_decay=args.decay)
 
     psi_optimizer = PsiSGD(psis, args.learning_rate, args.momentum,
-                           weight_decay=args.decay,
-                           nesterov=(args.momentum > 0.0))
+                           weight_decay=args.decay)
 
     recorder = RecorderMeter(args.epochs)
     if args.resume:
