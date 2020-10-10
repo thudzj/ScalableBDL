@@ -13,10 +13,10 @@ class _BayesConvNdEMP(Module):
     """
     __constants__ = ['stride', 'padding', 'dilation',
                      'groups', 'bias', 'in_channels',
-                     'out_channels', 'kernel_size']
+                     'out_channels', 'kernel_size', 'num_modes']
 
     def __init__(self, in_channels, out_channels, kernel_size, stride,
-                 padding, dilation, groups, bias):
+                 padding, dilation, groups, bias, num_modes):
         super(_BayesConvNdEMP, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -31,35 +31,29 @@ class _BayesConvNdEMP(Module):
         self.padding = padding
         self.dilation = dilation
         self.groups = groups
+        self.mode = None
+        self.num_modes = num_modes
 
-        self.weight_mu = Parameter(torch.Tensor(
-            out_channels, in_channels // groups, *self.kernel_size))
-        self.weight_psi = Parameter(torch.Tensor(
-            out_channels, in_channels // groups, *self.kernel_size))
+        self.weights = Parameter(torch.Tensor(
+            num_modes, out_channels, in_channels // groups, *self.kernel_size))
+        self.weight_size = list(self.weights.shape)[1:]
 
-        if bias is None or bias is False :
+        if bias is None or bias is False:
             self.bias = False
+            self.register_parameter('biases', None)
         else:
             self.bias = True
-
-        if self.bias:
-            self.bias_mu = Parameter(torch.Tensor(out_channels))
-            self.bias_psi = Parameter(torch.Tensor(out_channels))
-        else:
-            self.register_parameter('bias_mu', None)
-            self.register_parameter('bias_psi', None)
+            self.biases = Parameter(torch.Tensor(num_modes, out_channels))
         self.reset_parameters()
 
     def reset_parameters(self):
         n = self.in_channels
         n *= np.prod(list(self.kernel_size))
         stdv = 1.0 / math.sqrt(n)
-        self.weight_mu.data.uniform_(-stdv, stdv)
-        self.weight_psi.data.uniform_(-6, -5)
-
-        if self.bias :
-            self.bias_mu.data.uniform_(-stdv, stdv)
-            self.bias_psi.data.uniform_(-6, -5)
+        for i in range(self.num_modes):
+            self.weights[i].data.uniform_(-stdv, stdv)
+            if self.bias :
+                self.biases[i].data.uniform_(-stdv, stdv)
 
     def extra_repr(self):
         s = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
@@ -67,7 +61,8 @@ class _BayesConvNdEMP(Module):
         s += ', padding={padding}'
         s += ', dilation={dilation}'
         s += ', groups={groups}'
-        s += ', bias=False'
+        s += ', bias={bias}'
+        s += ', num_modes={num_modes}'
         return s.format(**self.__dict__)
 
     def __setstate__(self, state):
@@ -77,41 +72,32 @@ class BayesConv2dEMP(_BayesConvNdEMP):
     r"""
     Applies Bayesian Convolution for 2D inputs
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, 
-                 padding=0, dilation=1, groups=1, bias=False, deterministic=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=False, num_modes=20):
         super(BayesConv2dEMP, self).__init__(
-            in_channels, out_channels, kernel_size, stride, 
-            padding, dilation, groups, bias)
-        self.deterministic = deterministic
-        self.weight_size = list(self.weight_mu.shape)
-        self.bias_size = list(self.bias_mu.shape) if self.bias else None
-        self.mul_exp_add = MulExpAddFunction.apply
+            in_channels, out_channels, kernel_size, stride,
+            padding, dilation, groups, bias, num_modes)
 
     def forward(self, input):
         r"""
         Overriden.
         """
-        if self.deterministic:
-            out = F.conv2d(input, weight=self.weight_mu, bias=self.bias_mu,
-                            stride=self.stride, dilation=self.dilation,
-                            groups=self.groups, padding=self.padding)
+        if isinstance(self.mode, int):
+            out = F.conv2d(input, weight=self.weights[self.mode % self.num_modes],
+                           bias=self.biases[self.mode % self.num_modes] if self.bias else None,
+                           stride=self.stride, dilation=self.dilation,
+                           groups=self.groups, padding=self.padding)
         else:
             bs = input.shape[0]
-            weight = self.mul_exp_add(torch.randn(bs, *self.weight_size, 
-                                                  device=input.device, 
-                                                  dtype=input.dtype),
-                                      self.weight_psi, self.weight_mu).view(
-                                bs*self.weight_size[0], *self.weight_size[1:])
-            out = F.conv2d(input.view(1, -1, input.shape[2], input.shape[3]), 
+            idx = torch.tensor(self.mode, device=input.device, dtype=torch.long)
+            weight = self.weights[idx].view(bs*self.weight_size[0], *self.weight_size[1:])
+            out = F.conv2d(input.view(1, -1, input.shape[2], input.shape[3]),
                            weight=weight, bias=None,
                            stride=self.stride, dilation=self.dilation,
                            groups=self.groups*bs, padding=self.padding)
             out = out.view(bs, self.out_channels, out.shape[2], out.shape[3])
 
             if self.bias:
-                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size, 
-                                                    device=input.device, 
-                                                    dtype=input.dtype),
-                                        self.bias_psi, self.bias_mu)
+                bias = self.biases[idx]
                 out = out + bias[:, :, None, None]
         return out

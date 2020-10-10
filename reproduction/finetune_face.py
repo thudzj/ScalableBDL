@@ -149,7 +149,7 @@ def main_worker(gpu, ngpus_per_node, args):
     net = models.__dict__[args.arch](pretrained=True, num_classes=10341)
     disable_dropout(net)
     net = to_bayesian(net, args.psi_init_range)
-    net.apply(unfreeze)
+    unfreeze(net)
 
     print_log("Python version : {}".format(sys.version.replace('\n', ' ')), log)
     print_log("PyTorch  version : {}".format(torch.__version__), log)
@@ -324,11 +324,11 @@ def train(train_loader, ood_train_loader, model, criterion,
 
 def evaluate(val_loaders, fake_loader, net,
              criterion, args, log, num_mc_samples, num_mc_samples2):
-    net.apply(freeze)
+    freeze(net)
     if args.gpu == 0:
         print("-----------------deterministic-----------------")
     deter_rets = ens_validate(val_loaders, net, criterion, args, log, 1)
-    net.apply(unfreeze)
+    unfreeze(net)
 
     if args.gpu == 0:
         print("-----------------ensemble {} times-----------------".format(num_mc_samples2))
@@ -399,9 +399,9 @@ def ens_attack(val_loaders, model, criterion, args, log, num_ens=20, num_ens_a=8
         return grad_
 
     def _pgd_whitebox(X, mean, std):
-        model.apply(freeze)
+        freeze(model)
         y = model(X.sub(mean).div(std), True).reshape(X.size(0)//2, 2, -1)
-        model.apply(unfreeze)
+        unfreeze(model)
 
         X_pgd = X.clone()
         if args.random:

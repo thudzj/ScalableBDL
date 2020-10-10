@@ -150,7 +150,7 @@ def main_worker(gpu, ngpus_per_node, args):
     net = models.__dict__[args.arch](pretrained=True)
     disable_dropout(net)
     net = to_bayesian(net, args.psi_init_range)
-    net.apply(unfreeze)
+    unfreeze(net)
 
     print_log("Python version : {}".format(sys.version.replace('\n', ' ')), log)
     print_log("PyTorch  version : {}".format(torch.__version__), log)
@@ -331,9 +331,9 @@ def train(train_loader, ood_train_loader, model, criterion,
 
 def evaluate(test_loader, adv_loader, fake_loader, adv_loader2, net,
              criterion, args, log, num_mc_samples, num_mc_samples2):
-    net.apply(freeze)
+    freeze(net)
     deter_rets = ens_validate(test_loader, net, criterion, args, log, 1)
-    net.apply(unfreeze)
+    unfreeze(net)
 
     rets = ens_validate(test_loader, net, criterion, args, log, num_mc_samples2)
     print_log('TOP1 average: {:.4f}, ensemble: {:.4f}, deter: {:.4f}'.format(

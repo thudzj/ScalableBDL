@@ -39,30 +39,4 @@ def _to_bayesian(input):
         return input
 
 def to_deterministic(input):
-    return _to_deterministic(copy.deepcopy(input))
-
-def _to_deterministic(input):
-
-    if isinstance(input, (BayesLinearIMP, BayesConv2dIMP, BayesBatchNorm2dIMP)):
-        if isinstance(input, (BayesLinearIMP)):
-            output = Linear(input.in_features, input.out_features, input.bias)
-        elif isinstance(input, (BayesConv2dIMP)):
-            output = Conv2d(input.in_channels, input.out_channels,
-                            input.kernel_size, input.stride,
-                            input.padding, input.dilation,
-                            input.groups, input.bias)
-        else:
-            output = BatchNorm2d(input.num_features, input.eps,
-                                 input.momentum, input.affine,
-                                 input.track_running_stats)
-            setattr(output, 'running_mean', getattr(input, 'running_mean'))
-            setattr(output, 'running_var', getattr(input, 'running_var'))
-            setattr(output, 'num_batches_tracked', getattr(input, 'num_batches_tracked'))
-        # todo
-        setattr(output, 'weight', getattr(input, 'weight_mu'))
-        setattr(output, 'bias', getattr(input, 'bias_mu'))
-        return output
-    else:
-        for name, module in input.named_children():
-            setattr(input, name, to_deterministic(module))
-        return input
+    assert False, "Cannot convert an implicit BNN into DNN"

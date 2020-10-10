@@ -12,28 +12,24 @@ class _BayesBatchNormEMP(Module):
     __constants__ = ['track_running_stats',
                      'momentum', 'eps', 'weight', 'bias',
                      'running_mean', 'running_var', 'num_batches_tracked',
-                     'num_features', 'affine']
+                     'num_features', 'affine', 'num_modes']
 
-    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, 
-                 track_running_stats=True, deterministic=False):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True,
+                 track_running_stats=True, num_modes=20):
         super(_BayesBatchNormEMP, self).__init__()
         self.num_features = num_features
         self.eps = eps
         self.momentum = momentum
         self.affine = affine
         self.track_running_stats = track_running_stats
-        self.deterministic = deterministic
+        self.mode = None
+        self.num_modes = num_modes
         if self.affine:
-            self.weight_mu = Parameter(torch.Tensor(num_features))
-            self.weight_psi = Parameter(torch.Tensor(num_features))
-
-            self.bias_mu = Parameter(torch.Tensor(num_features))
-            self.bias_psi = Parameter(torch.Tensor(num_features))
+            self.weights = Parameter(torch.Tensor(num_modes, num_features))
+            self.biases = Parameter(torch.Tensor(num_modes, num_features))
         else:
-            self.register_parameter('weight_mu', None)
-            self.register_parameter('weight_psi', None)
-            self.register_parameter('bias_mu', None)
-            self.register_parameter('bias_psi', None)
+            self.register_parameter('weights', None)
+            self.register_parameter('biases', None)
         if self.track_running_stats:
             self.register_buffer('running_mean', torch.zeros(num_features))
             self.register_buffer('running_var', torch.ones(num_features))
@@ -44,10 +40,6 @@ class _BayesBatchNormEMP(Module):
             self.register_parameter('num_batches_tracked', None)
         self.reset_parameters()
 
-        self.weight_size = list(self.weight_mu.shape) if self.affine else None
-        self.bias_size = list(self.bias_mu.shape) if self.affine else None
-        self.mul_exp_add = MulExpAddFunction.apply
-
     def reset_running_stats(self):
         if self.track_running_stats:
             self.running_mean.zero_()
@@ -57,10 +49,8 @@ class _BayesBatchNormEMP(Module):
     def reset_parameters(self):
         self.reset_running_stats()
         if self.affine:
-            self.weight_mu.data.fill_(1)
-            self.weight_psi.data.uniform_(-6, -5)
-            self.bias_mu.data.zero_()
-            self.bias_psi.data.uniform_(-6, -5)
+            self.weights.data.fill_(1)
+            self.biases.data.zero_()
 
     def _check_input_dim(self, input):
         raise NotImplementedError
@@ -87,23 +77,18 @@ class _BayesBatchNormEMP(Module):
             exponential_average_factor, self.eps)
 
         if self.affine :
-            if self.deterministic:
-                weight = self.weight_mu.unsqueeze(0)
-                bias = self.bias_mu.unsqueeze(0)
+            if isinstance(self.mode, int):
+                self.mode = self.mode % self.num_modes
+                weight = self.weights[self.mode:(self.mode+1)]
+                bias = self.biases[self.mode:(self.mode+1)]
             else:
                 bs = input.shape[0]
-                weight = self.mul_exp_add(torch.randn(bs, *self.weight_size, 
-                                                      device=input.device, 
-                                                      dtype=input.dtype),
-                                          self.weight_psi, self.weight_mu)
-
-                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size, 
-                                                  device=input.device, 
-                                                  dtype=input.dtype),
-                                        self.bias_psi, self.bias_mu)
+                idx = torch.tensor(self.mode, device=input.device, dtype=torch.long)
+                weight = self.weights[idx]
+                bias = self.biases[idx]
 
             if out.dim() == 4:
-                out = torch.addcmul(bias[:, :, None, None], 
+                out = torch.addcmul(bias[:, :, None, None],
                                     weight[:, :, None, None], out)
             elif out.dim() == 2:
                 out = torch.addcmul(bias, weight, out)
@@ -112,7 +97,7 @@ class _BayesBatchNormEMP(Module):
         return out
 
     def extra_repr(self):
-        return '{num_features}, ' \
+        return '{num_features}, {num_modes},' \
                 'eps={eps}, momentum={momentum}, affine={affine}, ' \
                 'track_running_stats={track_running_stats}'.format(**self.__dict__)
 
