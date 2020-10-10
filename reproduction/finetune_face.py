@@ -14,8 +14,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.utils.data.distributed
 
-from scalablebdl.mean_field import PsiSGD
-from scalablebdl.converter import to_bayesian, to_deterministic
+from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
 from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout
 
 from utils import AverageMeter, RecorderMeter, time_string, \

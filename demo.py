@@ -2,9 +2,8 @@ import argparse
 from tqdm import tqdm
 import torch
 from torch.optim import SGD
-from scalablebdl.converter import to_bayesian, to_deterministic
 from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, Bayes_ensemble
-from scalablebdl.mean_field import PsiSGD
+from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
 
 import sys
 sys.path.insert(0, './reproduction')

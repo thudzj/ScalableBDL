@@ -1,13 +1,25 @@
 import torch
 from .mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
+from .empirical import BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP
+from .implicit import BayesLinearIMP, BayesConv2dIMP, BayesBatchNorm2dIMP
 
 def freeze(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
+            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)):
         m.deterministic = True
 
 def unfreeze(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
+            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)):
         m.deterministic = False
+
+def fix_mode(i, m):
+    if isinstance(m, (BayesConv2dEMP, BayesLinearEMP, BayesBatchNorm2dEMP)):
+        m.mode = i
+
+def unfix_mode(m):
+    if isinstance(m, (BayesConv2dEMP, BayesLinearEMP, BayesBatchNorm2dEMP)):
+        m.mode = -1
 
 def disable_dropout(net):
     for m in net.modules():
