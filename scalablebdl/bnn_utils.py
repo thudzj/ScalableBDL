@@ -22,12 +22,14 @@ def _unfreeze(m):
         m.deterministic = False
 
 # set_mode only works for empirical posterior
-def set_mode(net, mode='rand', batch_size=None, num_modes=20):
-    if mode == 'rand':
+def set_mode(net, mode=None, batch_size=None, num_modes=20):
+    if mode is None:
         mode = np.random.randint(0, num_modes, size=batch_size)
     else:
-        mode = int(mode)
-        assert mode >= 0 and mode < num_modes, "Mode must be in [0, num_modes)"
+        if isinstance(mode, int):
+            assert mode >= 0 and mode < num_modes, "Mode must be in [0, num_modes)"
+        else:
+            assert isinstance(mode, np.array)
     for m in net.modules():
         if isinstance(m, (BayesConv2dEMP, BayesLinearEMP, BayesBatchNorm2dEMP)):
             m.mode = mode
