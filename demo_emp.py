@@ -2,11 +2,11 @@ import argparse
 from tqdm import tqdm
 import torch
 from torch.optim import SGD
-from scalablebdl.bnn_utils import set_mode, disable_dropout, Bayes_ensemble
+from scalablebdl.bnn_utils import set_mc_sample_id, disable_dropout
 from scalablebdl.empirical import to_bayesian, to_deterministic
 
 import sys
-sys.path.insert(0, './reproduction')
+sys.path.insert(0, './exps')
 from dataset.cifar import load_dataset
 from models.wrn import wrn
 
@@ -20,20 +20,15 @@ if __name__ == '__main__':
     args.distributed = False
     args.batch_size = 64
     args.workers = 4
-    args.num_modes = 20
+    args.num_mc_samples = 20
     train_loader, test_loader = load_dataset(args)
 
     net = wrn(pretrained=True, depth=28, width=10).cuda()
     disable_dropout(net)
 
-    eval_loss, eval_acc = Bayes_ensemble(test_loader, net,
-                                         num_mc_samples=1)
-    print('Results of deterministic pre-training, '
-          'eval loss {}, eval acc {}'.format(eval_loss, eval_acc))
-
-    net.stage_3[-1].conv2 = to_bayesian(net.stage_3[-1].conv2, args.num_modes)
-    net.lastact = to_bayesian(net.lastact, args.num_modes)
-    net.classifier = to_bayesian(net.classifier, args.num_modes)
+    net.stage_3[-1].conv2 = to_bayesian(net.stage_3[-1].conv2, args.num_mc_samples)
+    net.lastact = to_bayesian(net.lastact, args.num_mc_samples)
+    net.classifier = to_bayesian(net.classifier, args.num_mc_samples)
 
     pretrained_params, one_layer_bayes_params = [], []
     for name, param in net.named_parameters():
@@ -45,7 +40,7 @@ if __name__ == '__main__':
     pretrained_optimizer = SGD(pretrained_params, lr=0.0008, momentum=0.9,
                                weight_decay=2e-4, nesterov=True)
     one_layer_bayes_optimizer = SGD(one_layer_bayes_params, lr=0.1, momentum=0.9,
-                                    weight_decay=2e-4/args.num_modes, nesterov=True)
+                                    weight_decay=2e-4/args.num_mc_samples, nesterov=True)
 
     for epoch in range(args.epochs):
         net.train()
@@ -53,7 +48,7 @@ if __name__ == '__main__':
             input = input.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True)
 
-            set_mode(net, batch_size=input.size(0))
+            set_mc_sample_id(net, args.num_mc_samples, batch_size=input.size(0))
             output = net(input)
             loss = torch.nn.functional.cross_entropy(output, target)
 
@@ -67,7 +62,6 @@ if __name__ == '__main__':
                 print("Epoch {}, ite {}/{}, loss {}".format(epoch, i,
                     len(train_loader), loss.item()))
 
-        eval_loss, eval_acc = Bayes_ensemble(test_loader, net,
-                                             num_mc_samples=args.num_modes)
+        eval_loss, eval_acc = Bayes_ensemble(test_loader, net)
         print("Epoch {}, eval loss {}, eval acc {}".format(
             epoch, eval_loss, eval_acc))

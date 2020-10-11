@@ -6,7 +6,7 @@ from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, Bayes_ensem
 from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
 
 import sys
-sys.path.insert(0, './reproduction')
+sys.path.insert(0, './exps')
 from dataset.cifar import load_dataset
 from models.wrn import wrn
 

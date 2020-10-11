@@ -79,12 +79,15 @@ class BayesConv2dMF(_BayesConvNdMF):
     r"""
     Applies Bayesian Convolution for 2D inputs
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, 
-                 padding=0, dilation=1, groups=1, bias=False, deterministic=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=False,
+                 deterministic=False, num_mc_samples=None):
         super(BayesConv2dMF, self).__init__(
-            in_channels, out_channels, kernel_size, stride, 
+            in_channels, out_channels, kernel_size, stride,
             padding, dilation, groups, bias)
         self.deterministic = deterministic
+        self.num_mc_samples = num_mc_samples
+        self.parallel_eval = False
         self.weight_size = list(self.weight_mu.shape)
         self.bias_size = list(self.bias_mu.shape) if self.bias else None
         self.mul_exp_add = MulExpAddFunction.apply
@@ -97,23 +100,47 @@ class BayesConv2dMF(_BayesConvNdMF):
             out = F.conv2d(input, weight=self.weight_mu, bias=self.bias_mu,
                             stride=self.stride, dilation=self.dilation,
                             groups=self.groups, padding=self.padding)
-        else:
+        elif not self.parallel_eval:
             bs = input.shape[0]
-            weight = self.mul_exp_add(torch.randn(bs, *self.weight_size, 
-                                                  device=input.device, 
+            weight = self.mul_exp_add(torch.randn(bs, *self.weight_size,
+                                                  device=input.device,
                                                   dtype=input.dtype),
                                       self.weight_psi, self.weight_mu).view(
                                 bs*self.weight_size[0], *self.weight_size[1:])
-            out = F.conv2d(input.view(1, -1, input.shape[2], input.shape[3]), 
+            out = F.conv2d(input.view(1, -1, input.shape[2], input.shape[3]),
                            weight=weight, bias=None,
                            stride=self.stride, dilation=self.dilation,
                            groups=self.groups*bs, padding=self.padding)
             out = out.view(bs, self.out_channels, out.shape[2], out.shape[3])
 
             if self.bias:
-                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size, 
-                                                    device=input.device, 
+                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size,
+                                                    device=input.device,
                                                     dtype=input.dtype),
                                         self.bias_psi, self.bias_mu)
                 out = out + bias[:, :, None, None]
+        else:
+            if input.dim() == 4:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
+
+            weight = self.mul_exp_add(torch.randn(self.num_mc_samples,
+                                                  *self.weight_size,
+                                                  device=input.device,
+                                                  dtype=input.dtype),
+                                      self.weight_psi, self.weight_mu).view(
+                self.num_mc_samples*self.weight_size[0], *self.weight_size[1:])
+            out = F.conv2d(input.flatten(start_dim=1, end_dim=2),
+                           weight=weight, bias=None,
+                           stride=self.stride, dilation=self.dilation,
+                           groups=self.groups*self.num_mc_samples,
+                           padding=self.padding)
+            out = out.view(out.shape[0], self.num_mc_samples,
+                           self.out_channels, out.shape[2], out.shape[3])
+            if self.bias:
+                bias = self.mul_exp_add(torch.randn(self.num_mc_samples,
+                                                    *self.bias_size,
+                                                    device=input.device,
+                                                    dtype=input.dtype),
+                                        self.bias_psi, self.bias_mu)
+                out = out + bias[None, :, :, None, None]
         return out

@@ -8,23 +8,26 @@ from torch.nn import Linear, Conv2d, BatchNorm2d
 
 from . import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
 
-def to_bayesian(input, psi_init_range=[-6, -5]):
-    return _to_bayesian(copy.deepcopy(input), psi_init_range)
+def to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20):
+    return _to_bayesian(copy.deepcopy(input), psi_init_range, num_mc_samples)
 
-def _to_bayesian(input, psi_init_range=[-6, -5]):
+def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20):
 
     if isinstance(input, (Linear, Conv2d, BatchNorm2d)):
         if isinstance(input, (Linear)):
-            output = BayesLinearMF(input.in_features, input.out_features, input.bias)
+            output = BayesLinearMF(input.in_features, input.out_features, 
+                                   input.bias, num_mc_samples=num_mc_samples)
         elif isinstance(input, (Conv2d)):
             output = BayesConv2dMF(input.in_channels, input.out_channels,
                                    input.kernel_size, input.stride,
                                    input.padding, input.dilation,
-                                   input.groups, input.bias)
+                                   input.groups, input.bias,
+                                   num_mc_samples=num_mc_samples)
         else:
             output = BayesBatchNorm2dMF(input.num_features, input.eps,
                                         input.momentum, input.affine,
-                                        input.track_running_stats)
+                                        input.track_running_stats,
+                                        num_mc_samples=num_mc_samples)
             setattr(output, 'running_mean', getattr(input, 'running_mean'))
             setattr(output, 'running_var', getattr(input, 'running_var'))
             setattr(output, 'num_batches_tracked', getattr(input, 'num_batches_tracked'))

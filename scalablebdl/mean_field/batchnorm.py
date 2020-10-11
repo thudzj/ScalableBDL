@@ -16,8 +16,8 @@ class _BayesBatchNormMF(Module):
                      'running_mean', 'running_var', 'num_batches_tracked',
                      'num_features', 'affine']
 
-    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, 
-                 track_running_stats=True, deterministic=False):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True,
+                 track_running_stats=True, deterministic=False, num_mc_samples=None):
         super(_BayesBatchNormMF, self).__init__()
         self.num_features = num_features
         self.eps = eps
@@ -25,6 +25,8 @@ class _BayesBatchNormMF(Module):
         self.affine = affine
         self.track_running_stats = track_running_stats
         self.deterministic = deterministic
+        self.num_mc_samples = num_mc_samples
+        self.parallel_eval = False
         if self.affine:
             self.weight_mu = Parameter(torch.Tensor(num_features))
             self.weight_psi = Parameter(torch.Tensor(num_features))
@@ -83,6 +85,11 @@ class _BayesBatchNormMF(Module):
                 else:
                     exponential_average_factor = self.momentum
 
+        if input.dim() == 4:
+            input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
+        elif input.dim() == 2:
+            input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
+        input = input.flatten(start_dim=0, end_dim=1)
         out = F.batch_norm(
             input, self.running_mean, self.running_var, None, None,
             self.training or not self.track_running_stats,
@@ -92,25 +99,53 @@ class _BayesBatchNormMF(Module):
             if self.deterministic:
                 weight = self.weight_mu.unsqueeze(0)
                 bias = self.bias_mu.unsqueeze(0)
-            else:
+
+                if out.dim() == 4:
+                    out = torch.addcmul(bias[:, :, None, None],
+                                        weight[:, :, None, None], out)
+                elif out.dim() == 2:
+                    out = torch.addcmul(bias, weight, out)
+                else:
+                    raise NotImplementedError
+            elif not self.parallel_eval:
                 bs = input.shape[0]
-                weight = self.mul_exp_add(torch.randn(bs, *self.weight_size, 
-                                                      device=input.device, 
+                weight = self.mul_exp_add(torch.randn(bs, *self.weight_size,
+                                                      device=input.device,
                                                       dtype=input.dtype),
                                           self.weight_psi, self.weight_mu)
 
-                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size, 
-                                                  device=input.device, 
+                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size,
+                                                  device=input.device,
                                                   dtype=input.dtype),
                                         self.bias_psi, self.bias_mu)
-
-            if out.dim() == 4:
-                out = torch.addcmul(bias[:, :, None, None], 
-                                    weight[:, :, None, None], out)
-            elif out.dim() == 2:
-                out = torch.addcmul(bias, weight, out)
+                if out.dim() == 4:
+                    out = torch.addcmul(bias[:, :, None, None],
+                                        weight[:, :, None, None], out)
+                elif out.dim() == 2:
+                    out = torch.addcmul(bias, weight, out)
+                else:
+                    raise NotImplementedError
             else:
-                raise NotImplementedError
+                weight = self.mul_exp_add(torch.randn(self.num_mc_samples,
+                                                      *self.weight_size,
+                                                      device=input.device,
+                                                      dtype=input.dtype),
+                                          self.weight_psi, self.weight_mu)
+                bias = self.mul_exp_add(torch.randn(self.num_mc_samples,
+                                                    *self.bias_size,
+                                                    device=input.device,
+                                                    dtype=input.dtype),
+                                        self.bias_psi, self.bias_mu)
+                if out.dim() == 4:
+                    out = out.view(-1, self.num_mc_samples, out.shape[1],
+                        out.shape[2], out.shape[3]) * weight[None, :, :, None, None] \
+                        + bias[None, :, :, None, None]
+                elif out.dim() == 2:
+                    out = out.view(-1, self.num_mc_samples, out.shape[1]) \
+                        * weight[None, :, :] + bias[None, :, :]
+                else:
+                    raise NotImplementedError
+
         return out
 
     def extra_repr(self):
@@ -136,7 +171,7 @@ class BayesBatchNorm2dMF(_BayesBatchNormMF):
     Applies Bayesian Batch Normalization over a 2D input
     """
     def _check_input_dim(self, input):
-        if input.dim() != 4:
+        if input.dim() != 4 and input.dim() != 5:
             raise ValueError('expected 4D input (got {}D input)'
                              .format(input.dim()))
 

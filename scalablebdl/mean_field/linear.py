@@ -13,12 +13,14 @@ class BayesLinearMF(Module):
     """
     __constants__ = ['bias', 'in_features', 'out_features']
 
-    def __init__(self, in_features, out_features, bias=True, 
-                 deterministic=False):
+    def __init__(self, in_features, out_features, bias=True,
+                 deterministic=False, num_mc_samples=None):
         super(BayesLinearMF, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.deterministic = deterministic
+        self.num_mc_samples = num_mc_samples
+        self.parallel_eval = False
 
         self.weight_mu = Parameter(torch.Tensor(out_features, in_features))
         self.weight_psi = Parameter(torch.Tensor(out_features, in_features))
@@ -57,18 +59,34 @@ class BayesLinearMF(Module):
             weight = self.weight_mu
             bias = self.bias_mu if self.bias else None
             out = F.linear(input, weight, bias)
-        else:
+        elif not self.parallel_eval:
             bs = input.shape[0]
-            weight = self.mul_exp_add(torch.randn(bs, *self.weight_size, 
-                                                  device=input.device, 
+            weight = self.mul_exp_add(torch.randn(bs, *self.weight_size,
+                                                  device=input.device,
                                                   dtype=input.dtype),
                                       self.weight_psi, self.weight_mu)
 
             out = torch.bmm(weight, input.unsqueeze(2)).squeeze()
             if self.bias:
-                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size, 
-                                                  device=input.device, 
+                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size,
+                                                  device=input.device,
                                                   dtype=input.dtype),
+                                        self.bias_psi, self.bias_mu)
+                out = out + bias
+        else:
+            if input.dim() == 2:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
+            weight = self.mul_exp_add(torch.randn(self.num_mc_samples,
+                                                  *self.weight_size,
+                                                  device=input.device,
+                                                  dtype=input.dtype),
+                                      self.weight_psi, self.weight_mu)
+            out = torch.bmm(weight, input.permute(1, 2, 0)).permute(2, 0, 1)
+            if self.bias:
+                bias = self.mul_exp_add(torch.randn(self.num_mc_samples, 
+                                                    *self.bias_size,
+                                                    device=input.device,
+                                                    dtype=input.dtype),
                                         self.bias_psi, self.bias_mu)
                 out = out + bias
         return out
