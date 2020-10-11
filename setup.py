@@ -6,7 +6,7 @@ install_requires = [
 
 setup(
     name='scalablebdl',
-    version='0.0.1',
+    version='0.0.2',
     description='Package for scalable Bayesian deep learning',
     url='git@github.com:thudzj/ScalableBDL.git',
     author='Zhijie Deng',
@@ -18,7 +18,9 @@ setup(
     zip_safe=False,
     package_data={
         'scalablebdl': [
-            'mean_field/*'
+            'mean_field/*',
+            'empirical/*',
+            'implicit/*',
         ],
     },
 
