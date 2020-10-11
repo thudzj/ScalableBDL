@@ -29,7 +29,7 @@ def set_mode(net, mode=None, batch_size=None, num_modes=20):
         if isinstance(mode, int):
             assert mode >= 0 and mode < num_modes, "Mode must be in [0, num_modes)"
         else:
-            assert isinstance(mode, np.array)
+            assert isinstance(mode, np.ndarray)
     for m in net.modules():
         if isinstance(m, (BayesConv2dEMP, BayesLinearEMP, BayesBatchNorm2dEMP)):
             m.mode = mode
