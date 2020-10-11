@@ -294,16 +294,18 @@ def train(train_loader, ood_train_loader, model, criterion,
         bs = input.shape[0]
         bs1 = input1.shape[0]
 
-        set_mode(model, batch_size=bs+bs1*2)
-        print(args.gpu, net.module.fc.mode)
+        mode = np.concatenate([np.random.randint(0, args.num_modes, size=bs),] +
+            [np.random.choice(args.num_modes, 2, replace=False) for _ in range(bs1)])
+        set_mode(model, mode, num_modes=args.num_modes)
         output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]))
         loss = criterion(output[:bs], target)
-        print(args.gpu, loss.item())
 
         out1_0 = output[bs:bs+bs1].softmax(-1)
         out1_1 = output[bs+bs1:].softmax(-1)
         mi1 = ent((out1_0 + out1_1)/2.) - (ent(out1_0) + ent(out1_1))/2.
         ur_loss = torch.nn.functional.relu(args.uncertainty_threshold - mi1).mean()
+
+        if args.gpu == 0: print(i, loss.item(), ur_loss.item())
 
         prec1, prec5 = accuracy(output[:bs], target, topk=(1, 5))
         losses.update(loss.detach().item(), bs)
@@ -375,7 +377,7 @@ def ens_validate(val_loader, model, criterion, args, log, num_mc_samples=20, suf
             target = target.cuda(args.gpu, non_blocking=True)
             targets.append(target)
             for ens in range(num_mc_samples):
-                set_mode(model, ens)
+                set_mode(model, ens, num_modes=args.num_modes)
                 output = model(input)
 
                 one_loss = criterion(output, target)
@@ -427,7 +429,7 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
         probs = torch.zeros(num_mc_samples, X.shape[0]).cuda(args.gpu)
         grads = torch.zeros(num_mc_samples, *list(X.shape)).cuda(args.gpu)
         for j in range(num_mc_samples):
-            set_mode(model, ens)
+            set_mode(model, ens, num_modes=args.num_modes)
             with model.no_sync():
                 with torch.enable_grad():
                     X.requires_grad_()
@@ -456,7 +458,7 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
         mis = 0
         preds = 0
         for ens in range(num_mc_samples):
-            set_mode(model, ens)
+            set_mode(model, ens, num_modes=args.num_modes)
             output = model(X_pgd.sub(mean).div(std))
             mis = (mis * ens + (-output.softmax(-1) * (output).log_softmax(-1)).sum(1)) / (ens + 1)
             preds = (preds * ens + output.softmax(-1)) / (ens + 1)
