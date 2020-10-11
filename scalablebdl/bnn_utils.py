@@ -1,36 +1,21 @@
 import numpy as np
 import torch
 from .mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
-from .empirical import BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP
-from .implicit import BayesLinearIMP, BayesConv2dIMP, BayesBatchNorm2dIMP
 
 # freeze and unfreeze work for mean-field and implicit posteriors
 def freeze(net):
     net.apply(_freeze)
 
 def _freeze(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
-            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)):
         m.deterministic = True
 
 def unfreeze(net):
     net.apply(_unfreeze)
 
 def _unfreeze(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
-            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)):
         m.deterministic = False
-
-# set_mode only works for empirical posterior
-def set_mode(net, mode='rand', batch_size=None, num_modes=20):
-    if mode == 'rand':
-        mode = np.random.randint(0, num_modes, size=batch_size)
-    else:
-        mode = int(mode)
-        assert mode >= 0 and mode < num_modes, "Mode must be in [0, num_modes)"
-    for m in net.modules():
-        if isinstance(m, (BayesConv2dEMP, BayesLinearEMP, BayesBatchNorm2dEMP)):
-            m.mode = mode
 
 def disable_dropout(net):
     for m in net.modules():
@@ -48,7 +33,6 @@ def Bayes_ensemble(loader, model, loss_metric=torch.nn.functional.cross_entropy,
             target = target.cuda(non_blocking=True)
             output = 0
             for j in range(num_mc_samples):
-                set_mode(model, j)
                 output += model(input).softmax(-1)
             output /= num_mc_samples
             total_loss += loss_metric(output.log(), target).item()
