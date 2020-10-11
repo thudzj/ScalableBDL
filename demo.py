@@ -30,11 +30,13 @@ if __name__ == '__main__':
     print('Results of deterministic pre-training, '
           'eval loss {}, eval acc {}'.format(eval_loss, eval_acc))
 
-    bayesian_net = to_bayesian(net)
-    unfreeze(bayesian_net)
+    net.stage_3[-1].conv2 = to_bayesian(net.stage_3[-1].conv2)
+    net.lastact = to_bayesian(net.lastact)
+    net.classifier = to_bayesian(net.classifier)
+    unfreeze(net)
 
     mus, psis = [], []
-    for name, param in bayesian_net.named_parameters():
+    for name, param in net.named_parameters():
         if 'psi' in name: psis.append(param)
         else: mus.append(param)
     mu_optimizer = SGD(mus, lr=0.0008, momentum=0.9,
@@ -44,12 +46,12 @@ if __name__ == '__main__':
                            num_data=50000)
 
     for epoch in range(args.epochs):
-        bayesian_net.train()
+        net.train()
         for i, (input, target) in enumerate(train_loader):
             input = input.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True)
 
-            output = bayesian_net(input)
+            output = net(input)
             loss = torch.nn.functional.cross_entropy(output, target)
 
             mu_optimizer.zero_grad()
@@ -62,6 +64,6 @@ if __name__ == '__main__':
                 print("Epoch {}, ite {}/{}, loss {}".format(epoch, i,
                     len(train_loader), loss.item()))
 
-        eval_loss, eval_acc = Bayes_ensemble(test_loader, bayesian_net)
+        eval_loss, eval_acc = Bayes_ensemble(test_loader, net)
         print("Epoch {}, eval loss {}, eval acc {}".format(
             epoch, eval_loss, eval_acc))
