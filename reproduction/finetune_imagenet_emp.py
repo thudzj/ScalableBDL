@@ -13,8 +13,8 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.utils.data.distributed
 
-from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
-from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout
+from scalablebdl.empirical import to_bayesian, to_deterministic
+from scalablebdl.bnn_utils import set_mode, disable_dropout
 
 from utils import AverageMeter, RecorderMeter, time_string, \
     convert_secs2time, _ECELoss, plot_mi, plot_ens, ent, accuracy, \
@@ -51,7 +51,7 @@ parser.add_argument('--decay', type=float, default=1e-4,
 # Checkpoints
 parser.add_argument('--save_path', type=str, default='/data/zhijie/snapshots_ba/',
                     help='Folder to save checkpoints and log.')
-parser.add_argument('--job-id', type=str, default='bayesadapter-imagenet')
+parser.add_argument('--job-id', type=str, default='bayesadapter-imagenet-emp')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='Path to latest checkpoint (default: none)')
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N')
@@ -66,7 +66,7 @@ parser.add_argument('--workers', type=int, default=4,
 parser.add_argument('--manualSeed', type=int, default=0, help='manual seed')
 
 # Bayesian
-parser.add_argument('--psi_init_range', type=float, nargs='+', default=[-6, -5])
+parser.add_argument('--num_modes', type=int, default=20)
 parser.add_argument('--num_fake', type=int, default=1000)
 parser.add_argument('--uncertainty_threshold', type=float, default=0.75)
 
@@ -149,10 +149,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
     net = models.__dict__[args.arch](pretrained=True)
     disable_dropout(net)
-    net.layer4[-1].conv3 = to_bayesian(net.layer4[-1].conv3, args.psi_init_range)
-    net.layer4[-1].bn3 = to_bayesian(net.layer4[-1].bn3, args.psi_init_range)
-    net.fc = to_bayesian(net.fc, args.psi_init_range)
-    unfreeze(net)
+    net.layer4[-1].conv3 = to_bayesian(net.layer4[-1].conv3, args.num_modes)
+    net.layer4[-1].bn3 = to_bayesian(net.layer4[-1].bn3, args.num_modes)
+    net.fc = to_bayesian(net.fc, args.num_modes)
 
     print_log("Python version : {}".format(sys.version.replace('\n', ' ')), log)
     print_log("PyTorch  version : {}".format(torch.__version__), log)
@@ -176,16 +175,19 @@ def main_worker(gpu, ngpus_per_node, args):
 
     criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
 
-    mus, psis = [], []
+    pretrained_params, one_layer_bayes_params = [], []
     for name, param in net.named_parameters():
-        if 'psi' in name: psis.append(param)
-        else: mus.append(param)
-    print(len(mus), len(psis))
-    mu_optimizer = SGD(mus, args.learning_rate, args.momentum,
-                       weight_decay=args.decay)
+        if 'weights' in name or 'biases' in name:
+            one_layer_bayes_params.append(param)
+        else:
+            pretrained_params.append(param)
 
-    psi_optimizer = PsiSGD(psis, args.learning_rate, args.momentum,
-                           weight_decay=args.decay)
+    print(len(pretrained_params), len(one_layer_bayes_params))
+
+    pretrained_optimizer = SGD(pretrained_params, args.learning_rate,
+                               args.momentum, weight_decay=args.decay)
+    one_layer_bayes_optimizer = SGD(one_layer_bayes_params, args.learning_rate,
+                                    args.momentum, weight_decay=args.decay/args.num_modes)
 
     recorder = RecorderMeter(args.epochs)
     if args.resume:
@@ -199,8 +201,8 @@ def main_worker(gpu, ngpus_per_node, args):
             args.start_epoch = checkpoint['epoch']
             net.load_state_dict(checkpoint['state_dict'] if args.distributed
                 else {k.replace('module.', ''): v for k,v in checkpoint['state_dict'].items()})
-            mu_optimizer.load_state_dict(checkpoint['mu_optimizer'])
-            psi_optimizer.load_state_dict(checkpoint['psi_optimizer'])
+            pretrained_optimizer.load_state_dict(checkpoint['pretrained_optimizer'])
+            one_layer_bayes_optimizer.load_state_dict(checkpoint['one_layer_bayes_optimizer'])
             best_acc = recorder.max_accuracy(False)
             print_log("=> loaded checkpoint '{}' accuracy={} (epoch {})".format(
                 args.resume, best_acc, checkpoint['epoch']), log)
@@ -213,11 +215,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     train_loader, ood_train_loader, test_loader, adv_loader, \
         fake_loader, adv_loader2 = load_dataset_ft(args)
-    psi_optimizer.num_data = len(train_loader.dataset)
 
     if args.evaluate:
         evaluate(test_loader, adv_loader, fake_loader,
-                 adv_loader2, net, criterion, args, log, 20, 100)
+                 adv_loader2, net, criterion, args, log, args.num_modes, args.num_modes)
         return
 
     start_time = time.time()
@@ -228,7 +229,7 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.distributed:
             train_loader.sampler.set_epoch(epoch)
             ood_train_loader.sampler.set_epoch(epoch)
-        cur_lr, cur_slr = adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args)
+        cur_lr, cur_slr = adjust_learning_rate(pretrained_optimizer, one_layer_bayes_optimizer, epoch, args)
 
         need_hour, need_mins, need_secs = convert_secs2time(epoch_time.avg * (args.epochs-epoch))
         need_time = '[Need: {:02d}:{:02d}:{:02d}]'.format(need_hour, need_mins, need_secs)
@@ -238,7 +239,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     + ' [Best : Accuracy={:.2f}, Error={:.2f}]'.format(recorder.max_accuracy(False), 100-recorder.max_accuracy(False)), log)
 
         train_acc, train_los = train(train_loader, ood_train_loader, net,
-                                     criterion, mu_optimizer, psi_optimizer,
+                                     criterion, pretrained_optimizer, one_layer_bayes_optimizer,
                                      epoch, args, log)
         val_acc, val_los = 0, 0
         recorder.update(epoch, train_los, train_acc, val_acc, val_los)
@@ -253,23 +254,22 @@ def main_worker(gpu, ngpus_per_node, args):
               'epoch': epoch + 1,
               'state_dict': net.state_dict(),
               'recorder': recorder,
-              'mu_optimizer' : mu_optimizer.state_dict(),
-              'psi_optimizer' : psi_optimizer.state_dict(),
+              'pretrained_optimizer' : pretrained_optimizer.state_dict(),
+              'one_layer_bayes_optimizer' : one_layer_bayes_optimizer.state_dict(),
             }, False, args.save_path, 'checkpoint.pth.tar')
 
         epoch_time.update(time.time() - start_time)
         start_time = time.time()
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
 
-    while True:
-        evaluate(test_loader, adv_loader, fake_loader,
-                 adv_loader2, net, criterion, args, log, 20, 100)
+    evaluate(test_loader, adv_loader, fake_loader,
+             adv_loader2, net, criterion, args, log, args.num_modes, args.num_modes)
 
     log[0].close()
 
 
 def train(train_loader, ood_train_loader, model, criterion,
-          mu_optimizer, psi_optimizer, epoch, args, log):
+          pretrained_optimizer, one_layer_bayes_optimizer, epoch, args, log):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -294,8 +294,11 @@ def train(train_loader, ood_train_loader, model, criterion,
         bs = input.shape[0]
         bs1 = input1.shape[0]
 
+        set_mode(model, batch_size=bs+bs1*2)
+        print(args.gpu, net.module.fc.mode)
         output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]))
         loss = criterion(output[:bs], target)
+        print(args.gpu, loss.item())
 
         out1_0 = output[bs:bs+bs1].softmax(-1)
         out1_1 = output[bs+bs1:].softmax(-1)
@@ -308,11 +311,11 @@ def train(train_loader, ood_train_loader, model, criterion,
         top1.update(prec1.item(), bs)
         top5.update(prec5.item(), bs)
 
-        mu_optimizer.zero_grad()
-        psi_optimizer.zero_grad()
+        pretrained_optimizer.zero_grad()
+        one_layer_bayes_optimizer.zero_grad()
         (loss+ur_loss*3).backward()
-        mu_optimizer.step()
-        psi_optimizer.step()
+        pretrained_optimizer.step()
+        one_layer_bayes_optimizer.step()
 
         batch_time.update(time.time() - end)
         end = time.time()
@@ -333,20 +336,16 @@ def train(train_loader, ood_train_loader, model, criterion,
 
 def evaluate(test_loader, adv_loader, fake_loader, adv_loader2, net,
              criterion, args, log, num_mc_samples, num_mc_samples2):
-    freeze(net)
-    deter_rets = ens_validate(test_loader, net, criterion, args, log, 1)
-    unfreeze(net)
 
     rets = ens_validate(test_loader, net, criterion, args, log, num_mc_samples2)
-    print_log('TOP1 average: {:.4f}, ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[:,2].mean(), rets[-1][-3], deter_rets[0][2]), log)
-    print_log('TOP5 average: {:.4f}, ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[:,3].mean(), rets[-1][-2], deter_rets[0][3]), log)
-    print_log('LOS  average: {:.4f}, ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[:,1].mean(), rets[-1][-4], deter_rets[0][1]), log)
-    print_log('ECE  ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[-1][-1], deter_rets[-1][-1]), log)
-    if args.gpu == 0: plot_ens(args.save_path, rets, deter_rets[0][2])
+    print_log('TOP1 average: {:.4f}, ensemble: {:.4f}'.format(
+        rets[:,2].mean(), rets[-1][-3]), log)
+    print_log('TOP5 average: {:.4f}, ensemble: {:.4f}'.format(
+        rets[:,3].mean(), rets[-1][-2]), log)
+    print_log('LOS  average: {:.4f}, ensemble: {:.4f}'.format(
+        rets[:,1].mean(), rets[-1][-4]), log)
+    print_log('ECE  ensemble: {:.4f}'.format(rets[-1][-1]), log)
+    if args.gpu == 0: plot_ens(args.save_path, rets, None)
 
     ens_attack(adv_loader, net, criterion, args, log, num_mc_samples)
     if args.gpu == 0:
@@ -376,6 +375,7 @@ def ens_validate(val_loader, model, criterion, args, log, num_mc_samples=20, suf
             target = target.cuda(args.gpu, non_blocking=True)
             targets.append(target)
             for ens in range(num_mc_samples):
+                set_mode(model, ens)
                 output = model(input)
 
                 one_loss = criterion(output, target)
@@ -427,6 +427,7 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
         probs = torch.zeros(num_mc_samples, X.shape[0]).cuda(args.gpu)
         grads = torch.zeros(num_mc_samples, *list(X.shape)).cuda(args.gpu)
         for j in range(num_mc_samples):
+            set_mode(model, ens)
             with model.no_sync():
                 with torch.enable_grad():
                     X.requires_grad_()
@@ -455,6 +456,7 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
         mis = 0
         preds = 0
         for ens in range(num_mc_samples):
+            set_mode(model, ens)
             output = model(X_pgd.sub(mean).div(std))
             mis = (mis * ens + (-output.softmax(-1) * (output).log_softmax(-1)).sum(1)) / (ens + 1)
             preds = (preds * ens + output.softmax(-1)) / (ens + 1)
@@ -508,7 +510,7 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
     if args.gpu == 0:
         np.save(os.path.join(args.save_path, 'mis_advg.npy'), mis.data.cpu().numpy())
 
-def adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args):
+def adjust_learning_rate(pretrained_optimizer, one_layer_bayes_optimizer, epoch, args):
     lr = args.learning_rate
     slr = args.learning_rate
     assert len(args.gammas) == len(args.schedule), \
@@ -517,8 +519,8 @@ def adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args):
         if (epoch >= step): slr = slr * gamma
         else: break
     lr = lr * np.prod(args.gammas)
-    for param_group in mu_optimizer.param_groups: param_group['lr'] = lr
-    for param_group in psi_optimizer.param_groups: param_group['lr'] = slr
+    for param_group in pretrained_optimizer.param_groups: param_group['lr'] = lr
+    for param_group in one_layer_bayes_optimizer.param_groups: param_group['lr'] = slr
     return lr, slr
 
 if __name__ == '__main__': main()

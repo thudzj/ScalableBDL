@@ -285,29 +285,40 @@ def plot_mi(dir_, type_, type2_=None):
         if type2_ is None else type2_, type_)), bbox_inches='tight')
     return ap
 
-def plot_ens(dir_, rets, baseline_acc):
+def plot_ens(dir_, rets, baseline_acc=None):
     lw = 1.25
     color = ['red', 'green', 'darkorange', 'b']
     if isinstance(rets, list):
         rets = np.stack([np.array(item) for item in rets])
-    min_acc = min(rets[:, 2].min(), rets[:, 6].min(), baseline_acc) - 0.1
-    max_acc = max(rets[:, 2].max(), rets[:, 6].max(), baseline_acc) + 0.1
+
+    if baseline_acc is not None:
+        min_acc = min(rets[:, 2].min(), rets[:, 6].min(), baseline_acc) - 0.1
+        max_acc = max(rets[:, 2].max(), rets[:, 6].max(), baseline_acc) + 0.1
+    else:
+        min_acc = min(rets[:, 2].min(), rets[:, 6].min()) - 0.1
+        max_acc = max(rets[:, 2].max(), rets[:, 6].max()) + 0.1
 
     fig = plt.figure(figsize=(4,3))
     fig, ax1 = plt.subplots(figsize=(4,3))
     l1 = ax1.plot(rets[:, 0]+1, rets[:, 2], color=color[0], lw=lw, alpha=0.6)
     l2 = ax1.plot(rets[:, 0]+1, rets[:, 6], color=color[1], lw=lw)
-    l3 = ax1.plot(rets[:, 0]+1, np.ones(rets.shape[0])*baseline_acc,
-        color=color[2], lw=lw, alpha=0.6, linestyle='dashed')
+    if baseline_acc is not None:
+        l3 = ax1.plot(rets[:, 0]+1, np.ones(rets.shape[0])*baseline_acc,
+            color=color[2], lw=lw, alpha=0.6, linestyle='dashed')
     ax1.set_yticks(np.arange(1, 101, 1))
     ax1.set_xticks([1,] + list(np.arange(20, rets.shape[0]+1, 20)))
     ax1.set_ylim((min_acc, max_acc))
     ax1.set_xlim((1, rets.shape[0]))
     ax1.set_xlabel('The number of MC sample')
     ax1.set_ylabel('Test accuracy (%)')
-    ax1.legend(l1+l2+l3, ['Individual', 'Ensemble', 'Deterministic'],
-        loc = 'best', fancybox=True, columnspacing=0.5, handletextpad=0.2,
-        borderpad=0.15) # +l3+l4 , 'Indiv ECE', 'Ensemble ECE'  , fontsize=11
+    if baseline_acc is not None:
+        ax1.legend(l1+l2+l3, ['Individual', 'Ensemble', 'Deterministic'],
+            loc = 'best', fancybox=True, columnspacing=0.5, handletextpad=0.2,
+            borderpad=0.15) # +l3+l4 , 'Indiv ECE', 'Ensemble ECE'  , fontsize=11
+    else:
+        ax1.legend(l1+l2, ['Individual', 'Ensemble'],
+            loc = 'best', fancybox=True, columnspacing=0.5, handletextpad=0.2,
+            borderpad=0.15) # +l3+l4 , 'Indiv ECE', 'Ensemble ECE'  , fontsize=11
     plt.savefig(os.path.join(dir_, 'ens_plot.pdf'), format='pdf',
         dpi=600, bbox_inches='tight')
 
