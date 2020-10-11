@@ -8,7 +8,7 @@ setup(
     name='scalablebdl',
     version='0.0.2',
     description='Package for scalable Bayesian deep learning',
-    url='git@github.com:thudzj/ScalableBDL.git',
+    url='git@github.com:thudzj/ScalableBDL.git@efficient',
     author='Zhijie Deng',
     author_email='dzj17@mails.tsinghua.edu.cn',
     license='license.txt',
