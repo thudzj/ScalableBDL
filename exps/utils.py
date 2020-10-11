@@ -16,7 +16,7 @@ import seaborn as sns
 from sklearn import metrics
 
 def ent(p):
-    return -(p*p.log()).sum(-1)
+    return -(p*((p+1e-10).log())).sum(-1)
 
 def accuracy(output, target, topk=(1,)):
     if len(target.shape) > 1: return torch.tensor(1), torch.tensor(1)

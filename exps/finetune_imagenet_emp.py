@@ -294,8 +294,8 @@ def train(train_loader, ood_train_loader, model, criterion,
         bs = input.shape[0]
         bs1 = input1.shape[0]
 
-        mode = np.concatenate([np.random.randint(0, args.num_modes, size=bs),] +
-            [np.random.choice(args.num_modes, 2, replace=False) for _ in range(bs1)])
+        mode = np.concatenate([np.random.randint(0, args.num_modes, size=bs),
+            np.stack([np.random.choice(args.num_modes, 2, replace=False) for _ in range(bs1)]).T.reshape(-1)])
         set_mode(model, mode, num_modes=args.num_modes)
         output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]))
         loss = criterion(output[:bs], target)
@@ -305,7 +305,7 @@ def train(train_loader, ood_train_loader, model, criterion,
         mi1 = ent((out1_0 + out1_1)/2.) - (ent(out1_0) + ent(out1_1))/2.
         ur_loss = torch.nn.functional.relu(args.uncertainty_threshold - mi1).mean()
 
-        if args.gpu == 0: print(i, loss.item(), ur_loss.item())
+        # if args.gpu == 0: print(i, loss.item(), mi1.data.cpu().numpy())
 
         prec1, prec5 = accuracy(output[:bs], target, topk=(1, 5))
         losses.update(loss.detach().item(), bs)

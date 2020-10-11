@@ -14,7 +14,8 @@ import torch.multiprocessing as mp
 import torch.utils.data.distributed
 
 from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
-from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout
+from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, \
+    parallel_eval, disable_parallel_eval
 
 from utils import AverageMeter, RecorderMeter, time_string, \
     convert_secs2time, _ECELoss, plot_mi, plot_ens, ent, accuracy, \
@@ -67,6 +68,7 @@ parser.add_argument('--manualSeed', type=int, default=0, help='manual seed')
 
 # Bayesian
 parser.add_argument('--psi_init_range', type=float, nargs='+', default=[-6, -5])
+parser.add_argument('--num_mc_samples', type=int, default=20)
 parser.add_argument('--num_fake', type=int, default=1000)
 parser.add_argument('--uncertainty_threshold', type=float, default=0.75)
 
@@ -149,9 +151,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
     net = models.__dict__[args.arch](pretrained=True)
     disable_dropout(net)
-    net.layer4[-1].conv3 = to_bayesian(net.layer4[-1].conv3, args.psi_init_range)
-    net.layer4[-1].bn3 = to_bayesian(net.layer4[-1].bn3, args.psi_init_range)
-    net.fc = to_bayesian(net.fc, args.psi_init_range)
+    net.layer4[-1].conv3 = to_bayesian(net.layer4[-1].conv3, args.psi_init_range, args.num_mc_samples)
+    net.layer4[-1].bn3 = to_bayesian(net.layer4[-1].bn3, args.psi_init_range, args.num_mc_samples)
+    net.fc = to_bayesian(net.fc, args.psi_init_range, args.num_mc_samples)
     unfreeze(net)
 
     print_log("Python version : {}".format(sys.version.replace('\n', ' ')), log)
@@ -217,7 +219,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.evaluate:
         evaluate(test_loader, adv_loader, fake_loader,
-                 adv_loader2, net, criterion, args, log, 20, 100)
+                 adv_loader2, net, criterion, args, log)
         return
 
     start_time = time.time()
@@ -263,7 +265,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     while True:
         evaluate(test_loader, adv_loader, fake_loader,
-                 adv_loader2, net, criterion, args, log, 20, 100)
+                 adv_loader2, net, criterion, args, log)
 
     log[0].close()
 
@@ -331,114 +333,96 @@ def train(train_loader, ood_train_loader, model, criterion,
     return top1.avg, losses.avg
 
 
-def evaluate(test_loader, adv_loader, fake_loader, adv_loader2, net,
-             criterion, args, log, num_mc_samples, num_mc_samples2):
-    freeze(net)
-    deter_rets = ens_validate(test_loader, net, criterion, args, log, 1)
-    unfreeze(net)
+def evaluate(test_loader, adv_loader, fake_loader,
+             adv_loader2, net, criterion, args, log):
 
-    rets = ens_validate(test_loader, net, criterion, args, log, num_mc_samples2)
-    print_log('TOP1 average: {:.4f}, ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[:,2].mean(), rets[-1][-3], deter_rets[0][2]), log)
-    print_log('TOP5 average: {:.4f}, ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[:,3].mean(), rets[-1][-2], deter_rets[0][3]), log)
-    print_log('LOS  average: {:.4f}, ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[:,1].mean(), rets[-1][-4], deter_rets[0][1]), log)
-    print_log('ECE  ensemble: {:.4f}, deter: {:.4f}'.format(
-        rets[-1][-1], deter_rets[-1][-1]), log)
-    if args.gpu == 0: plot_ens(args.save_path, rets, deter_rets[0][2])
+    top1, top5, val_loss, ens_ece = ens_validate(test_loader, net, criterion, args, log)
+    print_log('Parallel ensemble {} TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f},'
+              ' ECE: {:.4f}'.format(args.num_mc_samples, top1, top5, val_loss, ens_ece), log)
 
-    ens_attack(adv_loader, net, criterion, args, log, num_mc_samples)
+    ens_attack(adv_loader, net, criterion, args, log)
     if args.gpu == 0:
         print_log('NAT vs. ADV: AP {}'.format(plot_mi(args.save_path, 'advg')), log)
 
-    ens_validate(fake_loader, net, criterion, args, log, num_mc_samples, suffix='_fake')
+    ens_validate(fake_loader, net, criterion, args, log, suffix='_fake')
     if args.gpu == 0:
         print_log('NAT vs. Fake (BigGAN): AP {}'.format(plot_mi(args.save_path, 'fake')), log)
 
-    ens_validate(adv_loader2, net, criterion, args, log, num_mc_samples, suffix='_adv')
+    ens_validate(adv_loader2, net, criterion, args, log, suffix='_adv')
     if args.gpu == 0:
         print_log('NAT vs. FGSM-ResNet152: AP {}'.format(plot_mi(args.save_path, 'adv')), log)
     return rets[-1][-3], rets[-1][-4]
 
-
-def ens_validate(val_loader, model, criterion, args, log, num_mc_samples=20, suffix=''):
+def ens_validate(val_loader, model, criterion, args, log, suffix=''):
     model.eval()
+    parallel_eval(model)
 
     ece_func = _ECELoss().cuda(args.gpu)
     with torch.no_grad():
         targets = []
-        mis = [0 for _ in range(len(val_loader))]
-        preds = [0 for _ in range(len(val_loader))]
-        rets = torch.zeros(num_mc_samples, 9).cuda(args.gpu)
+        mis = []
+        preds = []
+        top1, top5, val_loss = 0, 0, 0
         for i, (input, target) in enumerate(val_loader):
             input = input.cuda(args.gpu, non_blocking=True)
             target = target.cuda(args.gpu, non_blocking=True)
             targets.append(target)
-            for ens in range(num_mc_samples):
-                output = model(input)
 
-                one_loss = criterion(output, target)
-                one_prec1, one_prec5 = accuracy(output, target, topk=(1, 5))
+            outputs = model(input).softmax(-1)
+            output = outputs.mean(-2)
+            mi = (- output * output.log()).sum(-1) \
+                - (-outputs * outputs.log()).sum(-1).mean(-1)
+            preds.append(output)
+            mis.append(mi)
+            loss = criterion(output.log(), target)
+            prec1, prec5 = accuracy(output, target, topk=(1, 5))
 
-                mis[i] = (mis[i] * ens + (-output.softmax(-1) *
-                    output.log_softmax(-1)).sum(1)) / (ens + 1)
-                preds[i] = (preds[i] * ens + output.softmax(-1)) / (ens + 1)
-
-                loss = criterion(preds[i].log(), target)
-                prec1, prec5 = accuracy(preds[i], target, topk=(1, 5))
-
-                rets[ens, 0] += ens*target.size(0)
-                rets[ens, 1] += one_loss.item()*target.size(0)
-                rets[ens, 2] += one_prec1.item()*target.size(0)
-                rets[ens, 3] += one_prec5.item()*target.size(0)
-                rets[ens, 5] += loss.item()*target.size(0)
-                rets[ens, 6] += prec1.item()*target.size(0)
-                rets[ens, 7] += prec5.item()*target.size(0)
+            top1 += prec1.item()*target.size(0)
+            top5 += prec5.item()*target.size(0)
+            val_loss += loss.item()*target.size(0)
 
         preds = torch.cat(preds, 0)
+        mis = torch.cat(mis, 0)
+        targets = torch.cat(targets, 0)
+        top1 /= targets.size(0)
+        top5 /= targets.size(0)
+        val_loss /= targets.size(0)
 
         # to sync
         confidences, predictions = torch.max(preds, 1)
-        targets = torch.cat(targets, 0)
-        mis = (- preds * preds.log()).sum(1) - torch.cat(mis, 0)
-        rets /= targets.size(0)
-
         if args.distributed:
             if suffix == '':
                 confidences = dist_collect(confidences)
                 predictions = dist_collect(predictions)
                 targets = dist_collect(targets)
             mis = dist_collect(mis)
-            rets = reduce_tensor(rets.data, args)
-        rets = rets.data.cpu().numpy()
+            top1 = reduce_tensor(top1.data, args)
+            top5 = reduce_tensor(top5.data, args)
+            val_loss = reduce_tensor(val_loss.data, args)
+
         if suffix == '':
             ens_ece = ece_func(confidences, predictions, targets,
                 os.path.join(args.save_path, 'ens_cal{}.pdf'.format(suffix)))
-            rets[-1, -1] = ens_ece
+        else:
+            ens_ece = None
 
     if args.gpu == 0:
         np.save(os.path.join(args.save_path, 'mis{}.npy'.format(suffix)),
             mis.data.cpu().numpy())
-    return rets
 
-def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
+    disable_parallel_eval(model)
+    return top1.item(), top5.item(), val_loss.item(), ens_ece
+
+def ens_attack(val_loader, model, criterion, args, log):
     def _grad(X, y, mean, std):
-        probs = torch.zeros(num_mc_samples, X.shape[0]).cuda(args.gpu)
-        grads = torch.zeros(num_mc_samples, *list(X.shape)).cuda(args.gpu)
-        for j in range(num_mc_samples):
-            with model.no_sync():
-                with torch.enable_grad():
-                    X.requires_grad_()
-                    output = model(X.sub(mean).div(std))
-                    loss = torch.nn.functional.cross_entropy(output, y, reduction='none')
-                    grad_ = torch.autograd.grad(
-                        [loss], [X], grad_outputs=torch.ones_like(loss),
-                        retain_graph=False)[0].detach()
-            grads[j] = grad_
-            probs[j] = torch.gather(output.detach().softmax(-1), 1, y[:,None]).squeeze()
-        probs /= probs.sum(0)
-        grad_ = (grads * probs[:, :, None, None, None]).sum(0)
+        with model.no_sync():
+            with torch.enable_grad():
+                X.requires_grad_()
+                outputs = model(X.sub(mean).div(std))
+                loss = torch.nn.functional.cross_entropy(outputs.mean(-2).log(), y, reduction='none')
+                grad_ = torch.autograd.grad(
+                    [loss], [X], grad_outputs=torch.ones_like(loss),
+                    retain_graph=False)[0].detach()
         return grad_
 
     def _pgd_whitebox(X, y, mean, std):
@@ -452,16 +436,12 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
             eta = torch.clamp(X_pgd - X, -args.epsilon, args.epsilon)
             X_pgd = torch.clamp(X + eta, 0, 1.0)
 
-        mis = 0
-        preds = 0
-        for ens in range(num_mc_samples):
-            output = model(X_pgd.sub(mean).div(std))
-            mis = (mis * ens + (-output.softmax(-1) * (output).log_softmax(-1)).sum(1)) / (ens + 1)
-            preds = (preds * ens + output.softmax(-1)) / (ens + 1)
-
+        outputs = model(X_pgd.sub(mean).div(std))
+        preds = outputs.mean(-2)
+        mis = (- preds * (preds+1e-10).log()).sum(-1) \
+            - (-outputs * outputs.log()).sum(-1).mean(-1)
         loss = criterion((preds+1e-8).log(), target)
         prec1, prec5 = accuracy(preds, target, topk=(1, 5))
-        mis = (- preds * (preds+1e-8).log()).sum(1) - mis
         return loss, prec1, prec5, mis
 
     if args.dataset == 'cifar10':
@@ -482,6 +462,7 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
 
     losses, top1, top5 = 0, 0, 0
     model.eval()
+    parallel_eval(model)
     with torch.no_grad():
         mis = []
         for i, (input, target) in enumerate(val_loader):
@@ -507,6 +488,7 @@ def ens_attack(val_loader, model, criterion, args, log, num_mc_samples=20):
         top1.item(), top5.item(), losses.item()), log)
     if args.gpu == 0:
         np.save(os.path.join(args.save_path, 'mis_advg.npy'), mis.data.cpu().numpy())
+    disable_parallel_eval(model)
 
 def adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args):
     lr = args.learning_rate
