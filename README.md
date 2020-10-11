@@ -29,9 +29,8 @@ With CIFAR-10 classification as an example, we can easily leverage this library 
 
 We first import the necessary modules for *Bayesian fine-tuning*:
 ```python
-from scalablebdl.converter import to_bayesian, to_deterministic
 from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, Bayes_ensemble
-from scalablebdl.mean_field import PsiSGD
+from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
 ```
 
 Then load the pre-trained wide-ResNet model, and disable the possible stochasticity inside the model:
@@ -51,7 +50,7 @@ print('Results of deterministic pre-training, '
 To expand the point-estimate parameters into Bayesian variables, we only need to invoke
 ```python
 bayesian_net = to_bayesian(net)
-bayesian_net.apply(unfreeze)
+unfreeze(bayesian_net)
 ```
 
 To realise fine-tuning, we build two optimizers with inherent weight decay modules for the mean and variance of the approximate posterior:
