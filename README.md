@@ -116,13 +116,11 @@ If you have any problem about this library or want to contribute to it, please s
 ## Cite
 Please cite our paper if you use this code in your own work:
 ```
-@inproceedings{
-deng2021bayesadapter,
-title={BayesAdapter: Being Bayesian, Inexpensively and Robustly, via Bayeisan Fine-tuning},
-author={Deng, Zhijie and Xiao, Yang and Hao, Zhang and Yinpeng, Dong and Zhu, Jun},
-booktitle={ArXiv},
-year={2021},
-url={https://arxiv.org/pdf/2010.01979.pdf},
+@article{deng2020bayesadapter,
+  title={BayesAdapter: Being Bayesian, Inexpensively and Robustly, via Bayeisan Fine-tuning},
+  author={Deng, Zhijie and Yang, Xiao and Zhang, Hao and Dong, Yinpeng and Zhu, Jun},
+  journal={arXiv preprint arXiv:2010.01979},
+  year={2020}
 }
 ```
 
