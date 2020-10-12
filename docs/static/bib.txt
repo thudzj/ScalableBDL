@@ -1,1 +1,6 @@
-None
+@article{deng2020bayesadapter,
+  title={BayesAdapter: Being Bayesian, Inexpensively and Robustly, via Bayeisan Fine-tuning},
+  author={Deng, Zhijie and Yang, Xiao and Zhang, Hao and Dong, Yinpeng and Zhu, Jun},
+  journal={arXiv preprint arXiv:2010.01979},
+  year={2020}
+}
