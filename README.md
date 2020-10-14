@@ -109,7 +109,7 @@ We compare the predictive performance between the fine-tuning start point (*DNN*
 ## Thanks to
 * @Harry24k [github:bayesian-neural-network-pytorch](https://github.com/Harry24k/bayesian-neural-network-pytorch)
 
-## Contact and coorperate
+## Contact and cooperate
 If you have any problem about this library or want to contribute to it, please send us an Email at:
 - dzj17@mails.tsinghua.edu.cn
 
