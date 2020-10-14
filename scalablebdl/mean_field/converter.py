@@ -41,7 +41,7 @@ def _to_bayesian(input, psi_init_range=[-6, -5]):
         return output
     else:
         for name, module in input.named_children():
-            setattr(input, name, to_bayesian(module))
+            setattr(input, name, _to_bayesian(module, psi_init_range))
         return input
 
 def to_deterministic(input):
@@ -70,5 +70,5 @@ def _to_deterministic(input):
         return output
     else:
         for name, module in input.named_children():
-            setattr(input, name, to_deterministic(module))
+            setattr(input, name, _to_deterministic(module))
         return input
