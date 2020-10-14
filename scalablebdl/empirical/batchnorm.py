@@ -12,21 +12,22 @@ class _BayesBatchNormEMP(Module):
     __constants__ = ['track_running_stats',
                      'momentum', 'eps', 'weight', 'bias',
                      'running_mean', 'running_var', 'num_batches_tracked',
-                     'num_features', 'affine', 'num_modes']
+                     'num_features', 'affine', 'num_mc_samples']
 
     def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True,
-                 track_running_stats=True, num_modes=20):
+                 track_running_stats=True, num_mc_samples=20):
         super(_BayesBatchNormEMP, self).__init__()
         self.num_features = num_features
         self.eps = eps
         self.momentum = momentum
         self.affine = affine
         self.track_running_stats = track_running_stats
-        self.mode = None
-        self.num_modes = num_modes
+        self.mc_sample_id = None
+        self.num_mc_samples = num_mc_samples
+        self.parallel_eval = False
         if self.affine:
-            self.weights = Parameter(torch.Tensor(num_modes, num_features))
-            self.biases = Parameter(torch.Tensor(num_modes, num_features))
+            self.weights = Parameter(torch.Tensor(num_mc_samples, num_features))
+            self.biases = Parameter(torch.Tensor(num_mc_samples, num_features))
         else:
             self.register_parameter('weights', None)
             self.register_parameter('biases', None)
@@ -71,33 +72,60 @@ class _BayesBatchNormEMP(Module):
                 else:
                     exponential_average_factor = self.momentum
 
+        if self.parallel_eval:
+            if input.dim() == 4:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
+            elif input.dim() == 2:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
+            input = input.flatten(start_dim=0, end_dim=1)
         out = F.batch_norm(
             input, self.running_mean, self.running_var, None, None,
             self.training or not self.track_running_stats,
             exponential_average_factor, self.eps)
 
         if self.affine :
-            if isinstance(self.mode, int):
-                self.mode = self.mode % self.num_modes
-                weight = self.weights[self.mode:(self.mode+1)]
-                bias = self.biases[self.mode:(self.mode+1)]
+            if self.parallel_eval:
+                if out.dim() == 4:
+                    out = out.view(-1, self.num_mc_samples, out.shape[1],
+                        out.shape[2], out.shape[3]) * self.weights[None, :, :, None, None] \
+                        + self.biases[None, :, :, None, None]
+                elif out.dim() == 2:
+                    out = out.view(-1, self.num_mc_samples, out.shape[1]) \
+                        * self.weights[None, :, :] + self.biases[None, :, :]
+                else:
+                    raise NotImplementedError
+
+            elif isinstance(self.mc_sample_id, int):
+                self.mc_sample_id = self.mc_sample_id % self.num_mc_samples
+                weight = self.weights[self.mc_sample_id:(self.mc_sample_id+1)]
+                bias = self.biases[self.mc_sample_id:(self.mc_sample_id+1)]
+
+                if out.dim() == 4:
+                    out = torch.addcmul(bias[:, :, None, None],
+                                        weight[:, :, None, None], out)
+                elif out.dim() == 2:
+                    out = torch.addcmul(bias, weight, out)
+                else:
+                    raise NotImplementedError
             else:
                 bs = input.shape[0]
-                idx = torch.tensor(self.mode, device=input.device, dtype=torch.long)
+                idx = torch.tensor(self.mc_sample_id, device=input.device, dtype=torch.long)
                 weight = self.weights[idx]
                 bias = self.biases[idx]
 
-            if out.dim() == 4:
-                out = torch.addcmul(bias[:, :, None, None],
-                                    weight[:, :, None, None], out)
-            elif out.dim() == 2:
-                out = torch.addcmul(bias, weight, out)
-            else:
-                raise NotImplementedError
+                if out.dim() == 4:
+                    out = torch.addcmul(bias[:, :, None, None],
+                                        weight[:, :, None, None], out)
+                elif out.dim() == 2:
+                    out = torch.addcmul(bias, weight, out)
+                else:
+                    raise NotImplementedError
+
+
         return out
 
     def extra_repr(self):
-        return '{num_features}, {num_modes},' \
+        return '{num_features}, {num_mc_samples},' \
                 'eps={eps}, momentum={momentum}, affine={affine}, ' \
                 'track_running_stats={track_running_stats}'.format(**self.__dict__)
 
@@ -119,7 +147,7 @@ class BayesBatchNorm2dEMP(_BayesBatchNormEMP):
     Applies Bayesian Batch Normalization over a 2D input
     """
     def _check_input_dim(self, input):
-        if input.dim() != 4:
+        if input.dim() != 4 and input.dim() != 5:
             raise ValueError('expected 4D input (got {}D input)'
                              .format(input.dim()))
 

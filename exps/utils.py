@@ -260,7 +260,7 @@ def plot_mi(dir_, type_, type2_=None):
     elif type_ == "fake2":
         label_ = 'Fake'
     else:
-        raise NotImplementedError
+        label_ = type_.capitalize()
 
     # Draw the density plot
     sns.distplot(mi_nat, hist = False, kde = True,
@@ -278,7 +278,7 @@ def plot_mi(dir_, type_, type2_=None):
 
     # Plot formatting
     plt.legend()#(prop={'size': 20})
-    plt.xlabel('Mutual information')#, fontsize=20)
+    plt.xlabel('Mutual information uncertainty')#, fontsize=20)
     plt.ylabel('Density')#, fontsize=20)
     plt.tight_layout()
     plt.savefig(os.path.join(dir_, '{}_vs_{}.pdf'.format('nat'

@@ -85,11 +85,12 @@ class _BayesBatchNormMF(Module):
                 else:
                     exponential_average_factor = self.momentum
 
-        if input.dim() == 4:
-            input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
-        elif input.dim() == 2:
-            input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
-        input = input.flatten(start_dim=0, end_dim=1)
+        if self.parallel_eval:
+            if input.dim() == 4:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
+            elif input.dim() == 2:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
+            input = input.flatten(start_dim=0, end_dim=1)
         out = F.batch_norm(
             input, self.running_mean, self.running_var, None, None,
             self.training or not self.track_running_stats,

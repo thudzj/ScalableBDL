@@ -115,6 +115,8 @@ class Bottleneck(nn.Module):
         if self.downsample is not None:
             identity = self.downsample(x)
 
+        if identity.dim() == out.dim() - 1:
+            identity = identity.unsqueeze(1)
         out += identity
         out = self.relu(out)
 
@@ -210,10 +212,15 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-
+        if x.dim() == 5:
+            x = self.avgpool(x.flatten(0, 1)).view(*x.shape[:3])
+            if isinstance(self.fc, nn.Linear):
+                x = self.fc(x.flatten(0, 1)).view(*x.shape[:2], -1)
+            else:
+                x = self.fc(x)
+        else:
+            x = self.avgpool(x).view(*x.shape[:2])
+            x = self.fc(x)
         return x
 
     def forward(self, x):

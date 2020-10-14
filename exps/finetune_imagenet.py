@@ -3,8 +3,10 @@ import os, sys, shutil, time, random, math
 import argparse
 import warnings
 import numpy as np
+from PIL import Image
 
 import torch
+import torchvision
 from torch.optim import SGD
 import torch.backends.cudnn as cudnn
 
@@ -13,25 +15,36 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.utils.data.distributed
 
-from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
-from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, \
-    parallel_eval, disable_parallel_eval
-
 from utils import AverageMeter, RecorderMeter, time_string, \
     convert_secs2time, _ECELoss, plot_mi, plot_ens, ent, accuracy, \
     reduce_tensor, dist_collect, print_log, save_checkpoint
 from dataset.imagenet import load_dataset_ft
 import models.resnet as models
+from models.resnet import conv1x1
+
+sys.path.insert(0, '../')
+from scalablebdl.mean_field import PsiSGD
+from scalablebdl.mean_field import to_bayesian as to_bayesian_mfg
+from scalablebdl.empirical import to_bayesian as to_bayesian_emp
+from scalablebdl.bnn_utils import freeze, unfreeze, set_mc_sample_id, \
+    disable_dropout, parallel_eval, disable_parallel_eval
 
 parser = argparse.ArgumentParser(description='Training script for ImageNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 # Data / Model
 parser.add_argument('--data_path', metavar='DPATH', type=str,
                     default='/data/LargeData/Large/ImageNet')
-parser.add_argument('--data_path_fake', metavar='DPATH', type=str,
-                    default='/data/zhijie/autobayes/gan_samples/imagenet/')
-parser.add_argument('--data_path_adv', metavar='DPATH', type=str,
-                    default='/data/zhijie/autobayes/adv_samples/fgsm_resnet_152')
+# parser.add_argument('--data_path_fake', metavar='DPATH', type=str,
+#                     default='/data/zhijie/autobayes/gan_samples/imagenet/')
+parser.add_argument('--data_path_adv_train', metavar='DPATH', type=str,
+                    default='/data/zhijie/adv_samples/imagenet')
+parser.add_argument('--adv_train_folders', type=str, nargs='+',
+                    default=['uniform', 'FGSM'])
+parser.add_argument('--data_path_adv_val', metavar='DPATH', type=str,
+                    default='/data/zhijie/autobayes/adv_samples')
+parser.add_argument('--adv_val_folders', type=str, nargs='+',
+                    default=['fgsm_resnet_152', 'mim_resnet_152',
+                             'bim_resnet_152', 'da_resnet_152'])
 parser.add_argument('--dataset', metavar='DSET', type=str, default='imagenet')
 parser.add_argument('--arch', metavar='ARCH', default='resnet50')
 
@@ -52,12 +65,14 @@ parser.add_argument('--decay', type=float, default=1e-4,
 # Checkpoints
 parser.add_argument('--save_path', type=str, default='/data/zhijie/snapshots_ba/',
                     help='Folder to save checkpoints and log.')
-parser.add_argument('--job-id', type=str, default='bayesadapter-imagenet')
+parser.add_argument('--job-id', type=str, default='onelayer-imagenet')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='Path to latest checkpoint (default: none)')
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='Evaluate model on test set')
+parser.add_argument('--generate_adv_samples', action='store_true',
+                    help='Generate adv samples for pre-trained models')
 
 # Acceleration
 parser.add_argument('--workers', type=int, default=4,
@@ -67,19 +82,24 @@ parser.add_argument('--workers', type=int, default=4,
 parser.add_argument('--manualSeed', type=int, default=0, help='manual seed')
 
 # Bayesian
+parser.add_argument('--posterior_type', type=str, default='mfg')
 parser.add_argument('--psi_init_range', type=float, nargs='+', default=[-6, -5])
 parser.add_argument('--num_mc_samples', type=int, default=20)
-parser.add_argument('--num_fake', type=int, default=1000)
+# parser.add_argument('--num_fake', type=int, default=1000)
 parser.add_argument('--uncertainty_threshold', type=float, default=0.75)
 
 # Fake generated data augmentation
-parser.add_argument('--blur_prob', type=float, default=0.5)
-parser.add_argument('--blur_sig', type=float, nargs='+', default=[0., 3.])
-parser.add_argument('--jpg_prob', type=float, default=0.5)
-parser.add_argument('--jpg_method', type=str, nargs='+', default=['cv2', 'pil'])
-parser.add_argument('--jpg_qual', type=int, nargs='+', default=[30, 100])
+# parser.add_argument('--blur_prob', type=float, default=0.5)
+# parser.add_argument('--blur_sig', type=float, nargs='+', default=[0., 3.])
+# parser.add_argument('--jpg_prob', type=float, default=0.5)
+# parser.add_argument('--jpg_method', type=str, nargs='+', default=['cv2', 'pil'])
+# parser.add_argument('--jpg_qual', type=int, nargs='+', default=[30, 100])
 
 # Attack settings
+parser.add_argument('--attack_methods', type=str, nargs='+',
+                    default=['FGSM', 'BIM', 'PGD', 'MIM'])
+parser.add_argument('--mim_momentum', default=1., type=float,
+                    help='mim_momentum')
 parser.add_argument('--epsilon', default=16./255., type=float,
                     help='perturbation')
 parser.add_argument('--num-steps', default=20, type=int,
@@ -151,10 +171,77 @@ def main_worker(gpu, ngpus_per_node, args):
 
     net = models.__dict__[args.arch](pretrained=True)
     disable_dropout(net)
-    net.layer4[-1].conv3 = to_bayesian(net.layer4[-1].conv3, args.psi_init_range, args.num_mc_samples)
-    net.layer4[-1].bn3 = to_bayesian(net.layer4[-1].bn3, args.psi_init_range, args.num_mc_samples)
-    net.fc = to_bayesian(net.fc, args.psi_init_range, args.num_mc_samples)
-    unfreeze(net)
+
+    criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
+
+    if args.generate_adv_samples:
+        if args.distributed:
+            if args.multiprocessing_distributed:
+                args.rank = args.rank * ngpus_per_node + gpu
+            dist.init_process_group(backend=args.dist_backend,
+                                    init_method=args.dist_url+":"+args.dist_port,
+                                    world_size=args.world_size, rank=args.rank)
+            torch.cuda.set_device(args.gpu)
+            net.cuda(args.gpu)
+            args.batch_size = int(args.batch_size / ngpus_per_node)
+            net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[args.gpu])
+        else:
+            torch.cuda.set_device(args.gpu)
+            net = net.cuda(args.gpu)
+
+        cudnn.benchmark = True
+
+        train_dataset = torchvision.datasets.ImageFolder(
+            os.path.join(args.data_path, 'train'),
+            torchvision.transforms.Compose([
+                torchvision.transforms.Resize(256),
+                torchvision.transforms.CenterCrop(256),
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                 std=[0.229, 0.224, 0.225])
+            ]))
+        rng = np.random.RandomState(0)
+        rand_idx = rng.permutation(len(train_dataset.samples))[:50000]
+        train_dataset.samples = [train_dataset.samples[i] for i in rand_idx]
+        train_dataset.targets = [train_dataset.targets[i] for i in rand_idx]
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if args.distributed else None
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+            num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+
+        for attack_method in args.attack_methods:
+            ens_attack(train_loader, net, criterion, args, log, attack_method)
+        torch.distributed.barrier()
+        exit()
+
+    if args.posterior_type == 'mfg':
+        net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].conv2 = to_bayesian_mfg(net.layer4[-1].conv2, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].bn2 = to_bayesian_mfg(net.layer4[-1].bn2, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].conv3 = to_bayesian_mfg(net.layer4[-1].conv3, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].bn3 = to_bayesian_mfg(net.layer4[-1].bn3, args.psi_init_range, args.num_mc_samples)
+        assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
+        net.layer4[-1].downsample = to_bayesian_mfg(torch.nn.Sequential(
+                conv1x1(net.layer4[-1].conv1.in_channels, net.layer4[-1].bn3.num_features, 1),
+                torch.nn.BatchNorm2d(net.layer4[-1].bn3.num_features),
+            ), args.psi_init_range, args.num_mc_samples, is_residual=True)
+        # net.fc = to_bayesian(net.fc, args.psi_init_range, args.num_mc_samples)
+    elif args.posterior_type == 'emp':
+        net.layer4[-1].conv1 = to_bayesian_emp(net.layer4[-1].conv1, args.num_mc_samples)
+        net.layer4[-1].bn1 = to_bayesian_emp(net.layer4[-1].bn1, args.num_mc_samples)
+        net.layer4[-1].conv2 = to_bayesian_emp(net.layer4[-1].conv2, args.num_mc_samples)
+        net.layer4[-1].bn2 = to_bayesian_emp(net.layer4[-1].bn2, args.num_mc_samples)
+        net.layer4[-1].conv3 = to_bayesian_emp(net.layer4[-1].conv3, args.num_mc_samples)
+        net.layer4[-1].bn3 = to_bayesian_emp(net.layer4[-1].bn3, args.num_mc_samples)
+        assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
+        net.layer4[-1].downsample = to_bayesian_emp(torch.nn.Sequential(
+                conv1x1(net.layer4[-1].conv1.in_channels, net.layer4[-1].bn3.num_features, 1),
+                torch.nn.BatchNorm2d(net.layer4[-1].bn3.num_features),
+            ), args.num_mc_samples, is_residual=True)
+        # net.fc = to_bayesian(net.fc, args.num_mc_samples)
+    else:
+        raise NotImplementedError
 
     print_log("Python version : {}".format(sys.version.replace('\n', ' ')), log)
     print_log("PyTorch  version : {}".format(torch.__version__), log)
@@ -176,18 +263,22 @@ def main_worker(gpu, ngpus_per_node, args):
         torch.cuda.set_device(args.gpu)
         net = net.cuda(args.gpu)
 
-    criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
-
-    mus, psis = [], []
+    pre_trained, new_added = [], []
     for name, param in net.named_parameters():
-        if 'psi' in name: psis.append(param)
-        else: mus.append(param)
-    print(len(mus), len(psis))
-    mu_optimizer = SGD(mus, args.learning_rate, args.momentum,
-                       weight_decay=args.decay)
+        if (args.posterior_type == 'mfg' and 'psi' in name) \
+                or (args.posterior_type == 'emp' and ('weights' in name or 'biases' in name)):
+            new_added.append(param)
+        else:
+            pre_trained.append(param)
+    pre_trained_optimizer = SGD(pre_trained, args.learning_rate, args.momentum,
+                                weight_decay=args.decay)
 
-    psi_optimizer = PsiSGD(psis, args.learning_rate, args.momentum,
-                           weight_decay=args.decay)
+    if args.posterior_type == 'mfg':
+        new_added_optimizer = PsiSGD(new_added, args.learning_rate, args.momentum,
+                                     weight_decay=args.decay)
+    else:
+        new_added_optimizer = SGD(new_added, args.learning_rate, args.momentum,
+                                  weight_decay=args.decay/args.num_mc_samples)
 
     recorder = RecorderMeter(args.epochs)
     if args.resume:
@@ -201,8 +292,8 @@ def main_worker(gpu, ngpus_per_node, args):
             args.start_epoch = checkpoint['epoch']
             net.load_state_dict(checkpoint['state_dict'] if args.distributed
                 else {k.replace('module.', ''): v for k,v in checkpoint['state_dict'].items()})
-            mu_optimizer.load_state_dict(checkpoint['mu_optimizer'])
-            psi_optimizer.load_state_dict(checkpoint['psi_optimizer'])
+            pre_trained_optimizer.load_state_dict(checkpoint['pre_trained_optimizer'])
+            new_added_optimizer.load_state_dict(checkpoint['new_added_optimizer'])
             best_acc = recorder.max_accuracy(False)
             print_log("=> loaded checkpoint '{}' accuracy={} (epoch {})".format(
                 args.resume, best_acc, checkpoint['epoch']), log)
@@ -213,13 +304,16 @@ def main_worker(gpu, ngpus_per_node, args):
 
     cudnn.benchmark = True
 
-    train_loader, ood_train_loader, test_loader, adv_loader, \
-        fake_loader, adv_loader2 = load_dataset_ft(args)
-    psi_optimizer.num_data = len(train_loader.dataset)
+    train_loader, ood_train_loader, test_loader, sub_test_loader, \
+        adv_loaders = load_dataset_ft(args)
+
+    if args.posterior_type == 'mfg':
+        new_added_optimizer.num_data = len(train_loader.dataset)
 
     if args.evaluate:
-        evaluate(test_loader, adv_loader, fake_loader,
-                 adv_loader2, net, criterion, args, log)
+        while True:
+            evaluate(test_loader, sub_test_loader, adv_loaders,
+                     net, criterion, args, log)
         return
 
     start_time = time.time()
@@ -230,7 +324,7 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.distributed:
             train_loader.sampler.set_epoch(epoch)
             ood_train_loader.sampler.set_epoch(epoch)
-        cur_lr, cur_slr = adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args)
+        cur_lr, cur_slr = adjust_learning_rate(pre_trained_optimizer, new_added_optimizer, epoch, args)
 
         need_hour, need_mins, need_secs = convert_secs2time(epoch_time.avg * (args.epochs-epoch))
         need_time = '[Need: {:02d}:{:02d}:{:02d}]'.format(need_hour, need_mins, need_secs)
@@ -240,10 +334,12 @@ def main_worker(gpu, ngpus_per_node, args):
                     + ' [Best : Accuracy={:.2f}, Error={:.2f}]'.format(recorder.max_accuracy(False), 100-recorder.max_accuracy(False)), log)
 
         train_acc, train_los = train(train_loader, ood_train_loader, net,
-                                     criterion, mu_optimizer, psi_optimizer,
+                                     criterion, pre_trained_optimizer, new_added_optimizer,
                                      epoch, args, log)
-        val_acc, val_los = 0, 0
-        recorder.update(epoch, train_los, train_acc, val_acc, val_los)
+        val_acc, val_los = evaluate(test_loader, sub_test_loader, adv_loaders,
+                                    net, criterion, args, log, sub_attack=True,
+                                    offline_eval=False)
+        recorder.update(epoch, train_los, train_acc, val_los, val_acc)
 
         is_best = False
         if val_acc > best_acc:
@@ -255,8 +351,8 @@ def main_worker(gpu, ngpus_per_node, args):
               'epoch': epoch + 1,
               'state_dict': net.state_dict(),
               'recorder': recorder,
-              'mu_optimizer' : mu_optimizer.state_dict(),
-              'psi_optimizer' : psi_optimizer.state_dict(),
+              'pre_trained_optimizer' : pre_trained_optimizer.state_dict(),
+              'new_added_optimizer' : new_added_optimizer.state_dict(),
             }, False, args.save_path, 'checkpoint.pth.tar')
 
         epoch_time.update(time.time() - start_time)
@@ -264,14 +360,14 @@ def main_worker(gpu, ngpus_per_node, args):
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
 
     while True:
-        evaluate(test_loader, adv_loader, fake_loader,
-                 adv_loader2, net, criterion, args, log)
+        evaluate(test_loader, sub_test_loader, adv_loaders,
+                 net, criterion, args, log)
 
     log[0].close()
 
 
 def train(train_loader, ood_train_loader, model, criterion,
-          mu_optimizer, psi_optimizer, epoch, args, log):
+          pre_trained_optimizer, new_added_optimizer, epoch, args, log):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -296,6 +392,10 @@ def train(train_loader, ood_train_loader, model, criterion,
         bs = input.shape[0]
         bs1 = input1.shape[0]
 
+        if args.posterior_type == 'emp':
+            mc_sample_id = np.concatenate([np.random.randint(0, args.num_mc_samples, size=bs),
+                np.stack([np.random.choice(args.num_mc_samples, 2, replace=False) for _ in range(bs1)]).T.reshape(-1)])
+            set_mc_sample_id(model, args.num_mc_samples, mc_sample_id)
         output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]))
         loss = criterion(output[:bs], target)
 
@@ -310,11 +410,11 @@ def train(train_loader, ood_train_loader, model, criterion,
         top1.update(prec1.item(), bs)
         top5.update(prec5.item(), bs)
 
-        mu_optimizer.zero_grad()
-        psi_optimizer.zero_grad()
-        (loss+ur_loss*3).backward()
-        mu_optimizer.step()
-        psi_optimizer.step()
+        pre_trained_optimizer.zero_grad()
+        new_added_optimizer.zero_grad()
+        (loss+ur_loss).backward() # edit here
+        pre_trained_optimizer.step()
+        new_added_optimizer.step()
 
         batch_time.update(time.time() - end)
         end = time.time()
@@ -333,25 +433,30 @@ def train(train_loader, ood_train_loader, model, criterion,
     return top1.avg, losses.avg
 
 
-def evaluate(test_loader, adv_loader, fake_loader,
-             adv_loader2, net, criterion, args, log):
+def evaluate(test_loader, sub_test_loader, adv_loaders,
+             net, criterion, args, log, sub_attack=False, offline_eval=True):
 
     top1, top5, val_loss, ens_ece = ens_validate(test_loader, net, criterion, args, log)
     print_log('Parallel ensemble {} TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f},'
               ' ECE: {:.4f}'.format(args.num_mc_samples, top1, top5, val_loss, ens_ece), log)
 
-    ens_attack(adv_loader, net, criterion, args, log)
-    if args.gpu == 0:
-        print_log('NAT vs. ADV: AP {}'.format(plot_mi(args.save_path, 'advg')), log)
+    if offline_eval:
+        for name, adv_loader_ in adv_loaders.items():
+            ens_validate(adv_loader_, net, criterion, args, log, suffix='_{}'.format(name))
+            if args.gpu == 0:
+                print_log('NAT vs. {}: AP {}'.format(name, plot_mi(args.save_path, name)), log)
 
-    ens_validate(fake_loader, net, criterion, args, log, suffix='_fake')
-    if args.gpu == 0:
-        print_log('NAT vs. Fake (BigGAN): AP {}'.format(plot_mi(args.save_path, 'fake')), log)
+    for attack_method in args.attack_methods:
+        ens_attack(sub_test_loader if sub_attack else test_loader,
+                   net, criterion, args, log, attack_method)
+        if args.gpu == 0:
+            print_log('NAT vs. {}: AP {}'.format(attack_method, plot_mi(args.save_path, attack_method)), log)
 
-    ens_validate(adv_loader2, net, criterion, args, log, suffix='_adv')
-    if args.gpu == 0:
-        print_log('NAT vs. FGSM-ResNet152: AP {}'.format(plot_mi(args.save_path, 'adv')), log)
-    return rets[-1][-3], rets[-1][-4]
+    # ens_validate(fake_loader, net, criterion, args, log, suffix='_fake')
+    # if args.gpu == 0:
+    #     print_log('NAT vs. Fake (BigGAN): AP {}'.format(plot_mi(args.save_path, 'fake')), log)
+
+    return top1, val_loss
 
 def ens_validate(val_loader, model, criterion, args, log, suffix=''):
     model.eval()
@@ -369,17 +474,18 @@ def ens_validate(val_loader, model, criterion, args, log, suffix=''):
             targets.append(target)
 
             outputs = model(input).softmax(-1)
+            assert outputs.dim() == 3
             output = outputs.mean(-2)
-            mi = (- output * output.log()).sum(-1) \
-                - (-outputs * outputs.log()).sum(-1).mean(-1)
+            mi = (- output * (output+1e-10).log()).sum(-1) \
+                - (-outputs * (outputs+1e-10).log()).sum(-1).mean(-1)
             preds.append(output)
             mis.append(mi)
-            loss = criterion(output.log(), target)
+            loss = criterion((output+1e-10).log(), target)
             prec1, prec5 = accuracy(output, target, topk=(1, 5))
 
-            top1 += prec1.item()*target.size(0)
-            top5 += prec5.item()*target.size(0)
-            val_loss += loss.item()*target.size(0)
+            top1 += prec1*target.size(0)
+            top5 += prec5*target.size(0)
+            val_loss += loss*target.size(0)
 
         preds = torch.cat(preds, 0)
         mis = torch.cat(mis, 0)
@@ -411,38 +517,62 @@ def ens_validate(val_loader, model, criterion, args, log, suffix=''):
             mis.data.cpu().numpy())
 
     disable_parallel_eval(model)
-    return top1.item(), top5.item(), val_loss.item(), ens_ece
+    return top1.item(), top5.item(), val_loss.item(), ens_ece.item() if ens_ece is not None else None
 
-def ens_attack(val_loader, model, criterion, args, log):
+def ens_attack(val_loader, model, criterion, args, log, attack_method):
     def _grad(X, y, mean, std):
         with model.no_sync():
             with torch.enable_grad():
                 X.requires_grad_()
-                outputs = model(X.sub(mean).div(std))
-                loss = torch.nn.functional.cross_entropy(outputs.mean(-2).log(), y, reduction='none')
+                outputs = model(X.sub(mean).div(std)).softmax(-1)
+                if outputs.dim() == 3:
+                    output = outputs.mean(-2) + 1e-10
+                else:
+                    output = outputs
+                loss = torch.nn.functional.cross_entropy(output.log(), y, reduction='none')
                 grad_ = torch.autograd.grad(
                     [loss], [X], grad_outputs=torch.ones_like(loss),
                     retain_graph=False)[0].detach()
         return grad_
 
-    def _pgd_whitebox(X, y, mean, std):
+    def _PGD_whitebox(X, y, mean, std):
         X_pgd = X.clone()
         if args.random:
             X_pgd += torch.cuda.FloatTensor(*X_pgd.shape).uniform_(-args.epsilon, args.epsilon)
-
         for _ in range(args.num_steps):
             grad_ = _grad(X_pgd, y, mean, std)
             X_pgd += args.step_size * grad_.sign()
             eta = torch.clamp(X_pgd - X, -args.epsilon, args.epsilon)
             X_pgd = torch.clamp(X + eta, 0, 1.0)
+        return X_pgd
 
-        outputs = model(X_pgd.sub(mean).div(std))
-        preds = outputs.mean(-2)
-        mis = (- preds * (preds+1e-10).log()).sum(-1) \
-            - (-outputs * outputs.log()).sum(-1).mean(-1)
-        loss = criterion((preds+1e-8).log(), target)
-        prec1, prec5 = accuracy(preds, target, topk=(1, 5))
-        return loss, prec1, prec5, mis
+    def _FGSM_whitebox(X, y, mean, std):
+        X_fgsm = X.clone()
+        grad_ = _grad(X_fgsm, y, mean, std)
+        eta = args.epsilon * grad_.sign()
+        X_fgsm = torch.clamp(X_fgsm + eta, 0, 1.0)
+        return X_fgsm
+
+    def _BIM_whitebox(X, y, mean, std):
+        X_bim = X.clone()
+        for _ in range(args.num_steps):
+            grad_ = _grad(X_bim, y, mean, std)
+            X_bim += args.step_size * grad_.sign()
+            eta = torch.clamp(X_bim - X, -args.epsilon, args.epsilon)
+            X_bim = torch.clamp(X + eta, 0, 1.0)
+        return X_bim
+
+    def _MIM_whitebox(X, y, mean, std):
+        X_mim = X.clone()
+        g = torch.zeros_like(X_mim)
+        for _ in range(args.num_steps):
+            grad_ = _grad(X_mim, y, mean, std)
+            grad_ /= grad_.abs().mean(dim=[1,2,3], keepdim=True)
+            g = g * args.mim_momentum + grad_
+            X_mim += args.step_size * g.sign()
+            eta = torch.clamp(X_mim - X, -args.epsilon, args.epsilon)
+            X_mim = torch.clamp(X + eta, 0, 1.0)
+        return X_mim
 
     if args.dataset == 'cifar10':
         mean = torch.from_numpy(np.array([x / 255
@@ -460,37 +590,56 @@ def ens_attack(val_loader, model, criterion, args, log):
         std = torch.from_numpy(np.array(
             [0.229, 0.224, 0.225])).view(1,3,1,1).cuda(args.gpu).float()
 
-    losses, top1, top5 = 0, 0, 0
     model.eval()
     parallel_eval(model)
     with torch.no_grad():
+        losses, top1, top5, num_data = 0, 0, 0, 0
         mis = []
         for i, (input, target) in enumerate(val_loader):
             input = input.cuda(args.gpu, non_blocking=True).mul_(std).add_(mean)
             target = target.cuda(args.gpu, non_blocking=True)
-            loss, prec1, prec5, mis_ = _pgd_whitebox(input, target, mean, std)
+
+            X_adv = eval('_{}_whitebox'.format(attack_method))(input, target, mean, std)
+            outputs = model(X_adv.sub(mean).div(std)).softmax(-1)
+
+            if outputs.dim() == 3:
+                output = outputs.mean(-2)
+                mi = (- output * (output+1e-10).log()).sum(-1) \
+                    - (-outputs * (outputs+1e-10).log()).sum(-1).mean(-1)
+                mis.append(mi)
+            else:
+                # only works for generating adv samples for pre-trained models
+                output = outputs
+                X_adv = (X_adv * 255).permute(0, 2, 3, 1).cpu().numpy().astype(np.uint8)
+                for j, img in enumerate(X_adv):
+                    im = Image.fromarray(img)
+                    im.save("/data/zhijie/adv_samples/{}/{}/all/{}_{}.png".format(
+                        args.dataset, attack_method, args.gpu, i*args.batch_size+j))
+            loss = criterion((output+1e-10).log(), target)
+            prec1, prec5 = accuracy(output, target, topk=(1, 5))
+
             losses += loss * target.size(0)
             top1 += prec1 * target.size(0)
             top5 += prec5 * target.size(0)
-            mis.append(mis_)
+            num_data += target.size(0)
 
-        mis = torch.cat(mis, 0)
-        losses /= mis.size(0)
-        top1 /= mis.size(0)
-        top5 /= mis.size(0)
+        losses /= num_data
+        top1 /= num_data
+        top5 /= num_data
         losses = reduce_tensor(losses.data, args)
         top1 = reduce_tensor(top1.data, args)
         top5 = reduce_tensor(top5.data, args)
 
-        if args.distributed: mis = dist_collect(mis)
+        mis = torch.cat(mis, 0) if len(mis) > 0 else None
+        if args.distributed and mis is not None: mis = dist_collect(mis)
 
-    print_log('ADV ensemble TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f}'.format(
-        top1.item(), top5.item(), losses.item()), log)
-    if args.gpu == 0:
-        np.save(os.path.join(args.save_path, 'mis_advg.npy'), mis.data.cpu().numpy())
+    # print_log('Attack by {}, ensemble TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f}'.format(
+        # attack_method, top1.item(), top5.item(), losses.item()), log)
+    if args.gpu == 0 and mis is not None:
+        np.save(os.path.join(args.save_path, 'mis_{}.npy'.format(attack_method)), mis.data.cpu().numpy())
     disable_parallel_eval(model)
 
-def adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args):
+def adjust_learning_rate(pre_trained_optimizer, new_added_optimizer, epoch, args):
     lr = args.learning_rate
     slr = args.learning_rate
     assert len(args.gammas) == len(args.schedule), \
@@ -499,8 +648,8 @@ def adjust_learning_rate(mu_optimizer, psi_optimizer, epoch, args):
         if (epoch >= step): slr = slr * gamma
         else: break
     lr = lr * np.prod(args.gammas)
-    for param_group in mu_optimizer.param_groups: param_group['lr'] = lr
-    for param_group in psi_optimizer.param_groups: param_group['lr'] = slr
+    for param_group in pre_trained_optimizer.param_groups: param_group['lr'] = lr
+    for param_group in new_added_optimizer.param_groups: param_group['lr'] = slr
     return lr, slr
 
 if __name__ == '__main__': main()

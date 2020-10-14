@@ -8,14 +8,14 @@ from torch.nn import Linear, Conv2d, BatchNorm2d
 
 from . import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
 
-def to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20):
-    return _to_bayesian(copy.deepcopy(input), psi_init_range, num_mc_samples)
+def to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=False):
+    return _to_bayesian(copy.deepcopy(input), psi_init_range, num_mc_samples, is_residual)
 
-def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20):
+def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=False):
 
     if isinstance(input, (Linear, Conv2d, BatchNorm2d)):
         if isinstance(input, (Linear)):
-            output = BayesLinearMF(input.in_features, input.out_features, 
+            output = BayesLinearMF(input.in_features, input.out_features,
                                    input.bias, num_mc_samples=num_mc_samples)
         elif isinstance(input, (Conv2d)):
             output = BayesConv2dMF(input.in_channels, input.out_channels,
@@ -34,9 +34,19 @@ def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20):
 
         setattr(output, 'weight_mu', getattr(input, 'weight'))
         setattr(output, 'bias_mu', getattr(input, 'bias'))
+        if is_residual:
+            if isinstance(input, (Conv2d)):
+                output.weight_mu.data = torch.eye(output.weight_mu.data.size(0)).unsqueeze(2).unsqueeze(3).float()
+                if output.bias_mu is not None:
+                    output.bias_mu.data.zero_()
+            elif isinstance(input, BatchNorm2d):
+                if output.affine:
+                    output.weight_mu.data.fill_(1.)
+                    output.bias_mu.data.zero_()
 
-        output.weight_psi.data.uniform_(psi_init_range[0], psi_init_range[1])
-        output.weight_psi.data = output.weight_psi.data.to(output.weight_mu.device)
+        if output.weight_psi is not None:
+            output.weight_psi.data.uniform_(psi_init_range[0], psi_init_range[1])
+            output.weight_psi.data = output.weight_psi.data.to(output.weight_mu.device)
         if output.bias_psi is not None:
             output.bias_psi.data.uniform_(psi_init_range[0], psi_init_range[1])
             output.bias_psi.data = output.bias_psi.data.to(output.bias_mu.device)
@@ -44,7 +54,7 @@ def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20):
         return output
     else:
         for name, module in input.named_children():
-            setattr(input, name, to_bayesian(module))
+            setattr(input, name, _to_bayesian(module, psi_init_range, num_mc_samples, is_residual))
         return input
 
 def to_deterministic(input):
@@ -73,5 +83,5 @@ def _to_deterministic(input):
         return output
     else:
         for name, module in input.named_children():
-            setattr(input, name, to_deterministic(module))
+            setattr(input, name, _to_deterministic(module))
         return input
