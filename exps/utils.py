@@ -322,6 +322,21 @@ def plot_ens(dir_, rets, baseline_acc=None):
     plt.savefig(os.path.join(dir_, 'ens_plot.pdf'), format='pdf',
         dpi=600, bbox_inches='tight')
 
+class NoneOptimizer():
+    def __init__(self):
+        self.param_groups = [{'lr': 0}]
+
+    def zero_grad(self):
+        pass
+
+    def step(self):
+        pass
+
+    def load_state_dict(self, _):
+        pass
+
+    def state_dict(self, **kargs):
+        return None
 
 #------------------------for face verification------------------------
 # MIT License

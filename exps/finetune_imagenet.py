@@ -17,7 +17,7 @@ import torch.utils.data.distributed
 
 from utils import AverageMeter, RecorderMeter, time_string, \
     convert_secs2time, _ECELoss, plot_mi, plot_ens, ent, accuracy, \
-    reduce_tensor, dist_collect, print_log, save_checkpoint
+    reduce_tensor, dist_collect, print_log, save_checkpoint, NoneOptimizer
 from dataset.imagenet import load_dataset_ft
 import models.resnet as models
 from models.resnet import conv1x1
@@ -39,7 +39,7 @@ parser.add_argument('--data_path', metavar='DPATH', type=str,
 parser.add_argument('--data_path_adv_train', metavar='DPATH', type=str,
                     default='/data/zhijie/adv_samples/imagenet')
 parser.add_argument('--adv_train_folders', type=str, nargs='+',
-                    default=['uniform', 'FGSM'])
+                    default=['uniform'])
 parser.add_argument('--data_path_adv_val', metavar='DPATH', type=str,
                     default='/data/zhijie/autobayes/adv_samples')
 parser.add_argument('--adv_val_folders', type=str, nargs='+',
@@ -87,6 +87,11 @@ parser.add_argument('--psi_init_range', type=float, nargs='+', default=[-6, -5])
 parser.add_argument('--num_mc_samples', type=int, default=20)
 # parser.add_argument('--num_fake', type=int, default=1000)
 parser.add_argument('--uncertainty_threshold', type=float, default=0.75)
+
+# Adv settings for Training
+parser.add_argument('--adv_uni_mixup', type=float, default=0.)
+parser.add_argument('--attack_method_training', type=str, default='FGSM')
+parser.add_argument('--attack_p_training', type=float, default=1.)
 
 # Fake generated data augmentation
 # parser.add_argument('--blur_prob', type=float, default=0.5)
@@ -203,8 +208,11 @@ def main_worker(gpu, ngpus_per_node, args):
         rng = np.random.RandomState(0)
         rand_idx = rng.permutation(len(train_dataset.samples))[:50000]
         train_dataset.samples = [train_dataset.samples[i] for i in rand_idx]
+        if args.gpu == 0:
+            for i, (path, _) in enumerate(train_dataset.samples):
+                shutil.copyfile(path, "/data/zhijie/adv_samples/imagenet/origin/all/{}_{}.JPEG".format(i%8, i//8))
         train_dataset.targets = [train_dataset.targets[i] for i in rand_idx]
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if args.distributed else None
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=False) if args.distributed else None
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
             num_workers=args.workers, pin_memory=True, sampler=train_sampler)
@@ -215,10 +223,10 @@ def main_worker(gpu, ngpus_per_node, args):
         exit()
 
     if args.posterior_type == 'mfg':
-        net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
-        net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
-        net.layer4[-1].conv2 = to_bayesian_mfg(net.layer4[-1].conv2, args.psi_init_range, args.num_mc_samples)
-        net.layer4[-1].bn2 = to_bayesian_mfg(net.layer4[-1].bn2, args.psi_init_range, args.num_mc_samples)
+        # net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
+        # net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
+        # net.layer4[-1].conv2 = to_bayesian_mfg(net.layer4[-1].conv2, args.psi_init_range, args.num_mc_samples)
+        # net.layer4[-1].bn2 = to_bayesian_mfg(net.layer4[-1].bn2, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].conv3 = to_bayesian_mfg(net.layer4[-1].conv3, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].bn3 = to_bayesian_mfg(net.layer4[-1].bn3, args.psi_init_range, args.num_mc_samples)
         assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
@@ -318,6 +326,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     start_time = time.time()
     epoch_time = AverageMeter()
+    rng = np.random.RandomState(args.manualSeed)
     train_los = -1
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -335,7 +344,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         train_acc, train_los = train(train_loader, ood_train_loader, net,
                                      criterion, pre_trained_optimizer, new_added_optimizer,
-                                     epoch, args, log)
+                                     epoch, args, rng, log)
         val_acc, val_los = evaluate(test_loader, sub_test_loader, adv_loaders,
                                     net, criterion, args, log, sub_attack=True,
                                     offline_eval=False)
@@ -367,7 +376,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 def train(train_loader, ood_train_loader, model, criterion,
-          pre_trained_optimizer, new_added_optimizer, epoch, args, log):
+          pre_trained_optimizer, new_added_optimizer, epoch, args, rng, log):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -385,17 +394,23 @@ def train(train_loader, ood_train_loader, model, criterion,
 
         input = input.cuda(args.gpu, non_blocking=True)
         target = target.cuda(args.gpu, non_blocking=True)
-
-        input1 = next(ood_train_loader_iter)
-        input1 = input1.cuda(args.gpu, non_blocking=True)
-
         bs = input.shape[0]
-        bs1 = input1.shape[0]
+
+        if rng.uniform() < args.attack_p_training:
+            bs1 = bs // 2
+            input1 = ens_attack((input[:bs1], target[:bs1]), model, None,
+                               args, log, args.attack_method_training)
+            model.train()
+        else:
+            input1 = next(ood_train_loader_iter)
+            input1 = input1.cuda(args.gpu, non_blocking=True)
+            bs1 = input1.shape[0]
 
         if args.posterior_type == 'emp':
             mc_sample_id = np.concatenate([np.random.randint(0, args.num_mc_samples, size=bs),
                 np.stack([np.random.choice(args.num_mc_samples, 2, replace=False) for _ in range(bs1)]).T.reshape(-1)])
             set_mc_sample_id(model, args.num_mc_samples, mc_sample_id)
+
         output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]))
         loss = criterion(output[:bs], target)
 
@@ -593,6 +608,13 @@ def ens_attack(val_loader, model, criterion, args, log, attack_method):
     model.eval()
     parallel_eval(model)
     with torch.no_grad():
+        # for generating adv samples for training
+        if isinstance(val_loader, tuple):
+            input, target = val_loader
+            X_adv = eval('_{}_whitebox'.format(attack_method))(input * std + mean, target, mean, std)
+            disable_parallel_eval(model)
+            return X_adv.sub_(mean).div_(std)
+
         losses, top1, top5, num_data = 0, 0, 0, 0
         mis = []
         for i, (input, target) in enumerate(val_loader):
@@ -612,8 +634,8 @@ def ens_attack(val_loader, model, criterion, args, log, attack_method):
                 output = outputs
                 X_adv = (X_adv * 255).permute(0, 2, 3, 1).cpu().numpy().astype(np.uint8)
                 for j, img in enumerate(X_adv):
-                    im = Image.fromarray(img)
-                    im.save("/data/zhijie/adv_samples/{}/{}/all/{}_{}.png".format(
+                    im = Image.fromarray(img, 'RGB')
+                    im.save("/data/zhijie/adv_samples/{}/{}/all/{}_{}.JPEG".format(
                         args.dataset, attack_method, args.gpu, i*args.batch_size+j))
             loss = criterion((output+1e-10).log(), target)
             prec1, prec5 = accuracy(output, target, topk=(1, 5))
