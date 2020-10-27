@@ -27,26 +27,10 @@ from models.resnet import conv1x1
 
 sys.path.insert(0, '../')
 from scalablebdl.mean_field import PsiSGD
-from scalablebdl.mean_field import to_bayesian as to_bayesian_mfg, BayesBatchNorm2dMF
-from scalablebdl.empirical import to_bayesian as to_bayesian_emp, BayesBatchNorm2dEMP
+from scalablebdl.mean_field import to_bayesian as to_bayesian_mfg
+from scalablebdl.empirical import to_bayesian as to_bayesian_emp
 from scalablebdl.bnn_utils import freeze, unfreeze, set_mc_sample_id, \
     disable_dropout, parallel_eval, disable_parallel_eval
-
-from batchnorm import BatchNorm2dDy, to_robust_bn
-
-def enable_robust_bn_tracking(net):
-    net.apply(_enable_robust_bn_tracking)
-
-def _enable_robust_bn_tracking(m):
-    if isinstance(m, (BayesBatchNorm2dMF, BayesBatchNorm2dEMP, BatchNorm2dDy)):
-        m.track_running_stats_half = True
-
-def disable_robust_bn_tracking(net):
-    net.apply(_disable_robust_bn_tracking)
-
-def _disable_robust_bn_tracking(m):
-    if isinstance(m, (BayesBatchNorm2dMF, BayesBatchNorm2dEMP, BatchNorm2dDy)):
-        m.track_running_stats_half = False
 
 parser = argparse.ArgumentParser(description='Training script for ImageNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -281,7 +265,6 @@ def main_worker(gpu, ngpus_per_node, args):
         # net.fc = to_bayesian(net.fc, args.num_mc_samples)
     else:
         raise NotImplementedError
-    net = to_robust_bn(net)
 
     print_log("Python version : {}".format(sys.version.replace('\n', ' ')), log)
     print_log("PyTorch  version : {}".format(torch.__version__), log)
@@ -298,7 +281,7 @@ def main_worker(gpu, ngpus_per_node, args):
         torch.cuda.set_device(args.gpu)
         net.cuda(args.gpu)
         args.batch_size = int(args.batch_size / ngpus_per_node)
-        net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[args.gpu],find_unused_parameters=True)
+        net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[args.gpu])
 
         attack_net.cuda(args.gpu)
         attack_net = torch.nn.parallel.DistributedDataParallel(attack_net, device_ids=[args.gpu])
@@ -445,7 +428,6 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
     # ood_train_loader_iter = iter(ood_train_loader)
 
     model.train()
-    enable_robust_bn_tracking(model)
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
@@ -515,7 +497,6 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
                         epoch, i, len(train_loader), batch_time=batch_time,
                         ur_loss=ur_losses, data_time=data_time, loss=losses,
                         top1=top1, top5=top5, eps=eps, slr=slr) + time_string(), log)
-    disable_robust_bn_tracking(model)
     return top1.avg, losses.avg
 
 

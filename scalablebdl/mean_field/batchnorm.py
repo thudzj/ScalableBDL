@@ -14,10 +14,10 @@ class _BayesBatchNormMF(Module):
     __constants__ = ['track_running_stats',
                      'momentum', 'eps', 'weight', 'bias',
                      'running_mean', 'running_var', 'num_batches_tracked',
-                     'num_features', 'affine', 'num_mc_samples']
+                     'num_features', 'affine']
 
     def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True,
-                 track_running_stats=True, deterministic=False, num_mc_samples=20):
+                 track_running_stats=True, deterministic=False, num_mc_samples=None):
         super(_BayesBatchNormMF, self).__init__()
         self.num_features = num_features
         self.eps = eps
@@ -26,7 +26,6 @@ class _BayesBatchNormMF(Module):
         self.track_running_stats = track_running_stats
         self.deterministic = deterministic
         self.num_mc_samples = num_mc_samples
-        self.track_running_stats_half = False
         self.parallel_eval = False
         if self.affine:
             self.weight_mu = Parameter(torch.Tensor(num_features))
@@ -79,18 +78,12 @@ class _BayesBatchNormMF(Module):
             exponential_average_factor = self.momentum
 
         if self.training and self.track_running_stats:
-            # TODO: if statement only here to tell the jit to skip emitting this when it is None
             if self.num_batches_tracked is not None:
-                self.num_batches_tracked = self.num_batches_tracked + 1
-                if self.momentum is None:  # use cumulative moving average
+                self.num_batches_tracked += 1
+                if self.momentum is None:
                     exponential_average_factor = 1.0 / float(self.num_batches_tracked)
-                else:  # use exponential moving average
+                else:
                     exponential_average_factor = self.momentum
-
-        if self.training:
-            bn_training = True
-        else:
-            bn_training = (self.running_mean is None) and (self.running_var is None)
 
         if self.parallel_eval:
             if input.dim() == 4:
@@ -98,30 +91,10 @@ class _BayesBatchNormMF(Module):
             elif input.dim() == 2:
                 input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
             input = input.flatten(start_dim=0, end_dim=1)
-
-        if not self.track_running_stats_half:
-            return F.batch_norm(
-                input,
-                # If buffers are not to be tracked, ensure that they won't be updated
-                self.running_mean if not self.training or self.track_running_stats else None,
-                self.running_var if not self.training or self.track_running_stats else None,
-                None, None, bn_training, exponential_average_factor, self.eps)
-        else:
-            assert self.training and not self.parallel_eval
-            o2 = (input[input.size(0)//2:] - self.running_mean.view(*([1, -1] + [1,]*(input.dim() - 2)))) / (self.running_var.view(*([1, -1] + [1,]*(input.dim() - 2))) + self.eps).sqrt()
-            # o2 = F.batch_norm(
-            #     input[input.size(0)//2:],
-            #     # If buffers are not to be tracked, ensure that they won't be updated
-            #     self.running_mean,
-            #     self.running_var,
-            #     None, None, False, exponential_average_factor, self.eps)
-            o1 = F.batch_norm(
-                input[:input.size(0)//2],
-                # If buffers are not to be tracked, ensure that they won't be updated
-                self.running_mean if not self.training or self.track_running_stats else None,
-                self.running_var if not self.training or self.track_running_stats else None,
-                None, None, bn_training, exponential_average_factor, self.eps)
-            return torch.cat([o1, o2])
+        out = F.batch_norm(
+            input, self.running_mean, self.running_var, None, None,
+            self.training or not self.track_running_stats,
+            exponential_average_factor, self.eps)
 
         if self.affine :
             if self.deterministic:
