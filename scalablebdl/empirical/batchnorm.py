@@ -24,6 +24,7 @@ class _BayesBatchNormEMP(Module):
         self.track_running_stats = track_running_stats
         self.mc_sample_id = None
         self.num_mc_samples = num_mc_samples
+        self.track_running_stats_half = False
         self.parallel_eval = False
         if self.affine:
             self.weights = Parameter(torch.Tensor(num_mc_samples, num_features))
@@ -65,12 +66,18 @@ class _BayesBatchNormEMP(Module):
             exponential_average_factor = self.momentum
 
         if self.training and self.track_running_stats:
+            # TODO: if statement only here to tell the jit to skip emitting this when it is None
             if self.num_batches_tracked is not None:
-                self.num_batches_tracked += 1
-                if self.momentum is None:
+                self.num_batches_tracked = self.num_batches_tracked + 1
+                if self.momentum is None:  # use cumulative moving average
                     exponential_average_factor = 1.0 / float(self.num_batches_tracked)
-                else:
+                else:  # use exponential moving average
                     exponential_average_factor = self.momentum
+
+        if self.training:
+            bn_training = True
+        else:
+            bn_training = (self.running_mean is None) and (self.running_var is None)
 
         if self.parallel_eval:
             if input.dim() == 4:
@@ -78,10 +85,30 @@ class _BayesBatchNormEMP(Module):
             elif input.dim() == 2:
                 input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
             input = input.flatten(start_dim=0, end_dim=1)
-        out = F.batch_norm(
-            input, self.running_mean, self.running_var, None, None,
-            self.training or not self.track_running_stats,
-            exponential_average_factor, self.eps)
+
+        if not self.track_running_stats_half:
+            return F.batch_norm(
+                input,
+                # If buffers are not to be tracked, ensure that they won't be updated
+                self.running_mean if not self.training or self.track_running_stats else None,
+                self.running_var if not self.training or self.track_running_stats else None,
+                None, None, bn_training, exponential_average_factor, self.eps)
+        else:
+            assert self.training and not self.parallel_eval
+            o2 = (input[input.size(0)//2:] - self.running_mean.view(*([1, -1] + [1,]*(input.dim() - 2)))) / (self.running_var.view(*([1, -1] + [1,]*(input.dim() - 2))) + self.eps).sqrt()
+            # o2 = F.batch_norm(
+            #     input[input.size(0)//2:],
+            #     # If buffers are not to be tracked, ensure that they won't be updated
+            #     self.running_mean,
+            #     self.running_var,
+            #     None, None, False, exponential_average_factor, self.eps)
+            o1 = F.batch_norm(
+                input[:input.size(0)//2],
+                # If buffers are not to be tracked, ensure that they won't be updated
+                self.running_mean if not self.training or self.track_running_stats else None,
+                self.running_var if not self.training or self.track_running_stats else None,
+                None, None, bn_training, exponential_average_factor, self.eps)
+            return torch.cat([o1, o2])
 
         if self.affine :
             if self.parallel_eval:
@@ -125,7 +152,7 @@ class _BayesBatchNormEMP(Module):
         return out
 
     def extra_repr(self):
-        return '{num_features}, {num_mc_samples},' \
+        return '{num_features}, {num_mc_samples}, ' \
                 'eps={eps}, momentum={momentum}, affine={affine}, ' \
                 'track_running_stats={track_running_stats}'.format(**self.__dict__)
 

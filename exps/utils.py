@@ -275,6 +275,8 @@ def plot_mi(dir_, type_, type2_=None):
     y[mi_nat.shape[0]:] = 1
 
     ap = metrics.average_precision_score(y, x)
+    fpr, tpr, thresholds = metrics.roc_curve(y, x)
+    accs = {th: tpr[np.argwhere(fpr <= th).max()] for th in [0.01, 0.05, 0.1]}
 
     # Plot formatting
     plt.legend()#(prop={'size': 20})
@@ -283,7 +285,7 @@ def plot_mi(dir_, type_, type2_=None):
     plt.tight_layout()
     plt.savefig(os.path.join(dir_, '{}_vs_{}.pdf'.format('nat'
         if type2_ is None else type2_, type_)), bbox_inches='tight')
-    return ap
+    return "AP: {:.4f}; ".format(ap) + "; ".join(["TPR: {:.4f} @ FPR={:.4f}".format(v, k) for k, v in accs.items()])
 
 def plot_ens(dir_, rets, baseline_acc=None):
     lw = 1.25
@@ -337,6 +339,29 @@ class NoneOptimizer():
 
     def state_dict(self, **kargs):
         return None
+
+def gaussian_kernel():
+    def gkern(kernlen=21, nsig=3):
+        """Returns a 2D Gaussian kernel array."""
+        import scipy.stats as st
+
+        x = np.linspace(-nsig, nsig, kernlen)
+        kern1d = st.norm.pdf(x)
+        kernel_raw = np.outer(kern1d, kern1d)
+        kernel = kernel_raw / kernel_raw.sum()
+        return kernel
+    kernel = gkern(7, 3).astype(np.float32)
+    stack_kernel = np.stack([kernel, kernel, kernel]).swapaxes(2, 0)
+    stack_kernel = np.expand_dims(stack_kernel, 3)
+    stack_kernel = stack_kernel.transpose((2, 3, 0, 1))
+    stack_kernel = torch.from_numpy(stack_kernel)
+    return stack_kernel
+
+def smooth(x, stack_kernel):
+    ''' implemenet depthwiseConv with padding_mode='SAME' in pytorch '''
+    padding = (stack_kernel.size(-1) - 1) // 2
+    groups = x.size(1)
+    return torch.nn.functional.conv2d(x, weight=stack_kernel, padding=padding, groups=groups)
 
 #------------------------for face verification------------------------
 # MIT License

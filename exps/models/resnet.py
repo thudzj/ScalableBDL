@@ -200,7 +200,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x):
+    def _forward_impl(self, x, return_features):
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.bn1(x)
@@ -213,18 +213,22 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         if x.dim() == 5:
-            x = self.avgpool(x.flatten(0, 1)).view(*x.shape[:3])
+            y = self.avgpool(x.flatten(0, 1)).view(*x.shape[:3])
             if isinstance(self.fc, nn.Linear):
-                x = self.fc(x.flatten(0, 1)).view(*x.shape[:2], -1)
+                y = self.fc(y.flatten(0, 1)).view(*y.shape[:2], -1)
             else:
-                x = self.fc(x)
+                y = self.fc(y)
         else:
-            x = self.avgpool(x).view(*x.shape[:2])
-            x = self.fc(x)
-        return x
+            y = self.avgpool(x).view(*x.shape[:2])
+            y = self.fc(y)
 
-    def forward(self, x):
-        return self._forward_impl(x)
+        if return_features:
+            return x, y
+        else:
+            return y
+
+    def forward(self, x, return_features=False):
+        return self._forward_impl(x, return_features)
 
 
 def _resnet(arch, block, layers, pretrained, progress, **kwargs):
