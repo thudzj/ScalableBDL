@@ -94,10 +94,13 @@ parser.add_argument('--uncertainty_threshold', type=float, default=0.75)
 # parser.add_argument('--attack_method_training', type=str, default='BIM')
 # parser.add_argument('--attack_p_training', type=float, default=0.5)
 parser.add_argument('--alpha', type=float, default=1.)
+parser.add_argument('--epsilon_max_train', type=float, default=1.)
 parser.add_argument('--epsilon_min_train', type=float, default=1.)
 # parser.add_argument('--epsilon_schedule', type=str, default='linear')
 
 # Fake generated data augmentation
+parser.add_argument('--sharpen_prob', type=float, default=0.)
+parser.add_argument('--sharpen_param', type=float, default=0.5)
 parser.add_argument('--blur_prob', type=float, default=0.5)
 parser.add_argument('--blur_kernel_size', type=int, nargs='+', default=[3, 5, 7, 9, 11])
 parser.add_argument('--blur_sig', type=float, nargs='+', default=[0., 5.])
@@ -154,6 +157,7 @@ def main():
     args.save_path = args.save_path + job_id
     if not os.path.isdir(args.save_path): os.makedirs(args.save_path)
 
+    args.epsilon_max_train *= args.epsilon
     args.epsilon_min_train *= args.epsilon
 
     args.use_cuda = torch.cuda.is_available()
@@ -238,10 +242,10 @@ def main_worker(gpu, ngpus_per_node, args):
     #     exit()
 
     if args.posterior_type == 'mfg':
-        # net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
-        # net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
-        # net.layer4[-1].conv2 = to_bayesian_mfg(net.layer4[-1].conv2, args.psi_init_range, args.num_mc_samples)
-        # net.layer4[-1].bn2 = to_bayesian_mfg(net.layer4[-1].bn2, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].conv2 = to_bayesian_mfg(net.layer4[-1].conv2, args.psi_init_range, args.num_mc_samples)
+        net.layer4[-1].bn2 = to_bayesian_mfg(net.layer4[-1].bn2, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].conv3 = to_bayesian_mfg(net.layer4[-1].conv3, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].bn3 = to_bayesian_mfg(net.layer4[-1].bn3, args.psi_init_range, args.num_mc_samples)
         assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
@@ -362,7 +366,7 @@ def main_worker(gpu, ngpus_per_node, args):
         #         print_log('NAT vs. {} from {} --> {}'.format(attack_method + "_transferred", args.transferred_attack_arch, plot_mi(args.save_path, attack_method + "_transferred")), log)
 
         while True:
-            evaluate(test_loader, sub_test_loader,
+            evaluate(train_loader, test_loader, sub_test_loader,
                      net, attack_net, criterion, mean, std, stack_kernel, args, log)
         return
 
@@ -387,7 +391,10 @@ def main_worker(gpu, ngpus_per_node, args):
         train_acc, train_los = train(train_loader, net,
                                      criterion, mean, std, stack_kernel, pre_trained_optimizer, new_added_optimizer,
                                      epoch, args, log)
-        val_acc, val_los = evaluate(test_loader, sub_test_loader,
+        if epoch == args.epochs - 1:
+            val_acc, val_los = 0, 0
+        else:
+            val_acc, val_los = evaluate(train_loader, test_loader, sub_test_loader,
                                     net, attack_net, criterion, mean, std, stack_kernel, args, log, sub_attack=True)
         recorder.update(epoch, train_los, train_acc, val_los, val_acc)
 
@@ -410,7 +417,7 @@ def main_worker(gpu, ngpus_per_node, args):
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
 
     while True:
-        evaluate(test_loader, sub_test_loader,
+        evaluate(train_loader, test_loader, sub_test_loader,
                  net, attack_net, criterion, mean, std, stack_kernel, args, log)
 
     log[0].close()
@@ -429,6 +436,8 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
 
     model.train()
 
+    beta = torch.distributions.beta.Beta(torch.tensor([args.sharpen_param]).cuda(args.gpu), torch.tensor([args.sharpen_param]).cuda(args.gpu))
+
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
         data_time.update(time.time() - end)
@@ -440,7 +449,7 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         bs = input.shape[0]
         bs1 = bs // 2
 
-        eps = np.random.uniform(args.epsilon_min_train, args.epsilon) #adjust_eps(args)
+        eps = np.random.uniform(args.epsilon_min_train, args.epsilon_max_train) #adjust_eps(args)
         # if rng.uniform() < args.attack_p_training:
         #     input1 = ens_attack((input[:bs1], target[:bs1]), model, None, mean, std, stack_kernel,
         #                        args, log, args.attack_method_training)
@@ -449,12 +458,16 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         #     # input1 = next(ood_train_loader_iter)
         #     # input1 = input1.cuda(args.gpu, non_blocking=True)
         input1 = input[:bs1].mul_(std).add_(mean)
-        uniform_noise = torch.empty_like(input1).uniform_(-eps, eps)
-        if np.random.uniform() < args.blur_prob:
-            gaussian_filter_kernel_size = int(np.random.choice(args.blur_kernel_size))
-            gaussian_filter_sigma = np.random.uniform(args.blur_sig[0], args.blur_sig[1])
-            uniform_noise = gaussian_blur2d(uniform_noise, (gaussian_filter_kernel_size, gaussian_filter_kernel_size), (gaussian_filter_sigma, gaussian_filter_sigma))
-        input1 = uniform_noise.add_(input1).clamp_(0, 1).sub_(mean).div_(std)
+        noise1 = beta.rsample(input1.shape).squeeze() * 2 * eps - eps
+        noise2 = torch.empty_like(input1).uniform_(-eps, eps)
+
+        mask = (torch.empty(bs1, device=input.device).random_(100) < args.sharpen_prob * 100).float().view(-1, 1, 1, 1)
+        noise = noise1 * mask + noise2 * (1 - mask)
+        # if np.random.uniform() < args.blur_prob:
+        #     gaussian_filter_kernel_size = int(np.random.choice(args.blur_kernel_size))
+        #     gaussian_filter_sigma = np.random.uniform(args.blur_sig[0], args.blur_sig[1])
+        #     noise = gaussian_blur2d(noise, (gaussian_filter_kernel_size, gaussian_filter_kernel_size), (gaussian_filter_sigma, gaussian_filter_sigma))
+        input1 = noise.add_(input1).clamp_(0, 1).sub_(mean).div_(std)
 
         if args.posterior_type == 'emp':
             mc_sample_id = np.concatenate([np.random.randint(0, args.num_mc_samples, size=bs),
@@ -500,12 +513,32 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
     return top1.avg, losses.avg
 
 
-def evaluate(test_loader, sub_test_loader,
+def evaluate(train_loader, test_loader, sub_test_loader,
              net, attack_net, criterion, mean, std, stack_kernel, args, log, sub_attack=False):
 
     top1, top5, val_loss, ens_ece = ens_validate(test_loader, net, criterion, args, log)
     print_log('Parallel ensemble {} TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f},'
               ' ECE: {:.4f}'.format(args.num_mc_samples, top1, top5, val_loss, ens_ece), log)
+
+    # net.train()
+    # with torch.no_grad():
+    #     batch_input = []
+    #     for i, (input, _) in enumerate(train_loader):
+    #         input = input.cuda(args.gpu, non_blocking=True)
+    #         batch_input.append(input)
+    #         if i % 4 == 3:
+    #             batch_input = torch.cat(batch_input)
+    #             if args.posterior_type == 'emp':
+    #                 mc_sample_id = np.random.randint(0, args.num_mc_samples, size=batch_input.size(0))
+    #                 set_mc_sample_id(net, args.num_mc_samples, mc_sample_id)
+    #             net(batch_input)
+    #             batch_input = []
+    #         if i == 999:
+    #             break
+    #
+    # top1, top5, val_loss, ens_ece = ens_validate(test_loader, net, criterion, args, log)
+    # print_log('Parallel ensemble {} TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f},'
+    #           ' ECE: {:.4f}'.format(args.num_mc_samples, top1, top5, val_loss, ens_ece), log)
     #
     # args.random = False
     # ens_attack(sub_test_loader if sub_attack else test_loader,
