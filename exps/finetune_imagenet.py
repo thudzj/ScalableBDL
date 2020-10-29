@@ -123,6 +123,7 @@ def main():
     args.save_path = args.save_path + job_id
     if not os.path.isdir(args.save_path): os.makedirs(args.save_path)
 
+    # step 0: note to pre-process some hyper-paramters
     args.epsilon_max_train *= args.epsilon
     args.epsilon_min_train *= args.epsilon
 
@@ -158,13 +159,9 @@ def main_worker(gpu, ngpus_per_node, args):
                args.manualSeed, '_eval' if args.evaluate else '')), 'w')
     log = (log, args.gpu)
 
-    net = models.__dict__[args.arch](pretrained=True)
-    disable_dropout(net)
-    attack_net = models.__dict__[args.transferred_attack_arch](pretrained=True)
-
-    criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
-
     # step 1: convert the last res-block to be Bayesian
+    net = models.__dict__[args.arch](pretrained=True)
+    # disable_dropout(net) # we may need to disable the dropout (not sure, need try)
     if args.posterior_type == 'mfg':
         net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
@@ -197,6 +194,8 @@ def main_worker(gpu, ngpus_per_node, args):
     print_log("CuDNN  version : {}".format(torch.backends.cudnn.version()), log)
     print_log("Number of parameters: {}".format(sum([p.numel() for p in net.parameters()])), log)
     print_log(str(args), log)
+
+    attack_net = models.__dict__[args.transferred_attack_arch](pretrained=True)
 
     if args.distributed:
         if args.multiprocessing_distributed:
@@ -258,7 +257,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print_log("=> do not use any checkpoint for the model", log)
 
     cudnn.benchmark = True
-
+    criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
     train_loader, test_loader, sub_test_loader = load_dataset_ft(args)
 
     if args.dataset == 'cifar10':
