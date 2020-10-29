@@ -25,6 +25,7 @@ from dataset.imagenet import load_dataset_ft
 import models.resnet as models
 from models.resnet import conv1x1
 
+# step 0: clone the ScalableBDL repo and checkout to the efficient branch
 sys.path.insert(0, '../')
 from scalablebdl.mean_field import PsiSGD
 from scalablebdl.mean_field import to_bayesian as to_bayesian_mfg
@@ -163,6 +164,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
 
+    # step 1: convert the last res-block to be Bayesian
     if args.posterior_type == 'mfg':
         net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
@@ -214,6 +216,7 @@ def main_worker(gpu, ngpus_per_node, args):
         net = net.cuda(args.gpu)
         attack_net = attack_net.cuda(args.gpu)
 
+    # step 2: build optimizers for the pre-trianed and added params
     pre_trained, new_added = [], []
     for name, param in net.named_parameters():
         if (args.posterior_type == 'mfg' and 'psi' in name) \
@@ -275,6 +278,7 @@ def main_worker(gpu, ngpus_per_node, args):
             [0.229, 0.224, 0.225])).view(1,3,1,1).cuda(args.gpu).float()
     stack_kernel = gaussian_kernel().cuda(args.gpu)
 
+    # step 2: set the num_data arg for new_added_optimizer if using mean-field Gaussian
     if args.posterior_type == 'mfg':
         new_added_optimizer.num_data = len(train_loader.dataset)
 
@@ -350,6 +354,7 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         target = target.cuda(args.gpu, non_blocking=True)
         bs = input.shape[0]
 
+        # step 3: fetch the half of the batch for generating uniformly perturbed samples
         bs1 = bs // 2
         input1 = input[:bs1]
 
@@ -360,21 +365,27 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         noise_lf = gaussian_blur2d(noise,
                                    (gaussian_filter_kernel_size, gaussian_filter_kernel_size),
                                    (gaussian_filter_sigma, gaussian_filter_sigma))
-
+        # step 3: using low-frequency noise with probability blur_prob
         mask = (torch.empty(bs1, device=input.device).random_(100)
             < args.blur_prob * 100).float().view(-1, 1, 1, 1)
         noise = noise_lf * mask + noise * (1 - mask)
 
+        # step 3: apply the noise
         input1 = input1.mul_(std).add_(mean).add_(noise).clamp_(0, 1).sub_(mean).div_(std)
 
+        # step 4: set mc_sample_id if using empirical distribution (population based)
         if args.posterior_type == 'emp':
-            mc_sample_id = np.concatenate([np.random.randint(0, args.num_mc_samples, size=bs),
-                np.stack([np.random.choice(args.num_mc_samples, 2, replace=False) for _ in range(bs1)]).T.reshape(-1)])
+            mc_sample_id = np.concatenate([
+                np.random.randint(0, args.num_mc_samples, size=bs),
+                np.stack([np.random.choice(args.num_mc_samples, 2, replace=False) for _ in range(bs1)]).T.reshape(-1)
+                ])
             set_mc_sample_id(model, args.num_mc_samples, mc_sample_id)
 
+        # step 5: forward prop for predicted logits of normal data and features of noisy data
         features, output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]), return_features=True)
-        loss = criterion(output[:bs], target)
 
+        # step 6: calculate CE loss and uncertainty loss
+        loss = criterion(output[:bs], target)
         out1_0 = features[bs:bs+bs1]
         out1_1 = features[bs+bs1:]
         mi = ((out1_0 - out1_1)**2).mean(dim=[1,2,3])
@@ -386,6 +397,7 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         top1.update(prec1.item(), bs)
         top5.update(prec5.item(), bs)
 
+        # step 7: backward prop and perform optimization
         pre_trained_optimizer.zero_grad()
         new_added_optimizer.zero_grad()
         (loss+ur_loss).backward()
@@ -436,6 +448,7 @@ def evaluate(test_loader, attack_loader, net, attack_net,
 
 def ens_validate(val_loader, model, criterion, args, log, suffix=''):
     model.eval()
+    # evaluation/adv attack step 1: enable parallel_eval
     parallel_eval(model)
 
     ece_func = _ECELoss().cuda(args.gpu)
@@ -449,6 +462,8 @@ def ens_validate(val_loader, model, criterion, args, log, suffix=''):
             target = target.cuda(args.gpu, non_blocking=True)
             targets.append(target)
 
+            # evaluation/adv attack step 2: obtain features for estimating uncertainty (mi);
+            # obtain output, which is in the shape [batch_size, num_mc_samples, num_classes] and need to be transformed via outputs.softmax(-1).mean(-2) to get predicted probability
             features, outputs = model(input, return_features=True)
             assert outputs.dim() == 3
             output = outputs.softmax(-1).mean(-2)
@@ -491,6 +506,7 @@ def ens_validate(val_loader, model, criterion, args, log, suffix=''):
         np.save(os.path.join(args.save_path, 'mis{}.npy'.format(suffix)),
             mis.data.cpu().numpy())
 
+    # evaluation/adv attack step 3: disable parallel_eval
     disable_parallel_eval(model)
     return top1.item(), top5.item(), val_loss.item(), ens_ece.item() if ens_ece is not None else None
 
