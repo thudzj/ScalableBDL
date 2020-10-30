@@ -14,6 +14,7 @@ import torch.nn.parallel
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.utils.data.distributed
+import torch.nn.functional as F
 
 from kornia import gaussian_blur2d
 
@@ -83,7 +84,7 @@ parser.add_argument('--blur_sig', type=float, nargs='+', default=[0., 5.])
 
 # Attack settings
 parser.add_argument('--attack_methods', type=str, nargs='+',
-                    default=['FGSM', 'BIM', 'PGD', 'MIM', 'TIM', 'FGSM_L2', 'BIM_L2', 'PGD_L2'])
+                    default=['FGSM', 'CW', 'BIM', 'PGD', 'MIM', 'TIM', 'DI_MIM', 'FGSM_L2', 'BIM_L2', 'PGD_L2'])
 parser.add_argument('--mim_momentum', default=1., type=float,
                     help='mim_momentum')
 parser.add_argument('--epsilon', default=16./255., type=float,
@@ -385,7 +386,7 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         out1_0 = features[bs:bs+bs1]
         out1_1 = features[bs+bs1:]
         mi = ((out1_0 - out1_1)**2).mean(dim=[1,2,3])
-        ur_loss = torch.nn.functional.relu(args.uncertainty_threshold - mi).mean()
+        ur_loss = F.relu(args.uncertainty_threshold - mi).mean()
 
         prec1, prec5 = accuracy(output[:bs], target, topk=(1, 5))
         losses.update(loss.detach().item(), bs)
@@ -517,7 +518,7 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
                     output = outputs.mean(-2) + 1e-10
                 else:
                     output = outputs
-                loss = torch.nn.functional.cross_entropy(output.log(), y, reduction='none')
+                loss = F.cross_entropy(output.log(), y, reduction='none')
                 grad_ = torch.autograd.grad(
                     [loss], [X], grad_outputs=torch.ones_like(loss),
                     retain_graph=False)[0].detach()
@@ -649,6 +650,9 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
         X_cw = X.clone()
         y_one_hot = F.one_hot(y, num_classes=1000)
         for _ in range(args.num_steps):
+            X_cw.requires_grad_()
+            if X_cw.grad is not None: del X_cw.grad
+            X_cw.grad = None
             with torch.enable_grad():
                 outputs = attack_model(X_cw.sub(mean).div(std)).softmax(-1)
                 if outputs.dim() == 3:
@@ -661,7 +665,7 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
                 loss = torch.mean(logit_other - logit_target)
                 loss.backward()
 
-            X_cw += args.step_size * X_cw.grad.data.sign()
+            X_cw += args.step_size * X_cw.grad.sign()
             eta = torch.clamp(X_cw - X, -args.epsilon, args.epsilon)
             X_cw = torch.clamp(X + eta, 0, 1.0)
         return X_cw

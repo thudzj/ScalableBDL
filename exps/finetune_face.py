@@ -14,6 +14,7 @@ import torch.nn.parallel
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.utils.data.distributed
+import torch.nn.functional as F
 
 from kornia import gaussian_blur2d
 
@@ -82,7 +83,7 @@ parser.add_argument('--blur_sig', type=float, nargs='+', default=[0., 5.])
 
 # Attack settings
 parser.add_argument('--attack_methods', type=str, nargs='+',
-                    default=['FGSM', 'BIM', 'PGD', 'MIM', 'TIM', 'FGSM_L2', 'BIM_L2', 'PGD_L2'])
+                    default=['FGSM', 'BIM', 'PGD', 'MIM', 'TIM', 'DI_MIM', 'FGSM_L2', 'BIM_L2', 'PGD_L2'])
 parser.add_argument('--mim_momentum', default=1., type=float,
                     help='mim_momentum')
 parser.add_argument('--epsilon', default=16./255., type=float,
@@ -348,7 +349,7 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         out1_0 = features[bs:bs+bs1]
         out1_1 = features[bs+bs1:]
         mi = ((out1_0 - out1_1)**2).mean(dim=[1,2,3])
-        ur_loss = torch.nn.functional.relu(args.uncertainty_threshold - mi).mean()
+        ur_loss = F.relu(args.uncertainty_threshold - mi).mean()
 
         prec1, prec5 = accuracy(output[:bs], target, topk=(1, 5))
         losses.update(loss.detach().item(), bs)

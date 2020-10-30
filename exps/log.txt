@@ -105,7 +105,7 @@
 
 
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face --posterior_type emp --data_path /data/zhijie/faces_emore --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 (gpu16)
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face --posterior_type emp --data_path /data/zhijie/faces_emore --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 (gpu16) (or face1)
 
 
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id emp-nores-blur.05 --posterior_type emp --blur_prob 0.05 (gpu28)

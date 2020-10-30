@@ -165,6 +165,7 @@ class MobileNetV2(nn.Module):
         # Cannot use "squeeze" as batch-size can be 1 => must use reshape with x.shape[0]
         if x.dim() == 5:
             y = nn.functional.adaptive_avg_pool2d(x.flatten(0, 1), 1).view(*x.shape[:3])
+            assert not is_logits
             if is_logits:
                 if isinstance(self.classifier[1], nn.Linear):
                     y = self.classifier(y.flatten(0, 1)).view(*y.shape[:2], -1)
