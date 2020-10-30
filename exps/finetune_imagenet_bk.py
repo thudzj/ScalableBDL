@@ -18,14 +18,13 @@ import torch.utils.data.distributed
 from kornia import gaussian_blur2d
 
 from utils import AverageMeter, RecorderMeter, time_string, \
-    convert_secs2time, _ECELoss, plot_mi, accuracy, \
-    reduce_tensor, dist_collect, print_log, save_checkpoint, \
+    convert_secs2time, _ECELoss, plot_mi, plot_ens, ent, accuracy, \
+    reduce_tensor, dist_collect, print_log, save_checkpoint, NoneOptimizer, \
     gaussian_kernel, smooth
 from dataset.imagenet import load_dataset_ft
 import models.resnet as models
-# from models.resnet import conv1x1
+from models.resnet import conv1x1
 
-# step 0: clone the ScalableBDL repo and checkout to the efficient branch
 sys.path.insert(0, '../')
 from scalablebdl.mean_field import PsiSGD
 from scalablebdl.mean_field import to_bayesian as to_bayesian_mfg
@@ -38,16 +37,27 @@ parser = argparse.ArgumentParser(description='Training script for ImageNet', for
 # Data / Model
 parser.add_argument('--data_path', metavar='DPATH', type=str,
                     default='/data/LargeData/Large/ImageNet')
+# parser.add_argument('--data_path_fake', metavar='DPATH', type=str,
+#                     default='/data/zhijie/autobayes/gan_samples/imagenet/')
+# parser.add_argument('--data_path_adv_train', metavar='DPATH', type=str,
+#                     default='/data/zhijie/adv_samples/imagenet')
+# parser.add_argument('--adv_train_folders', type=str, nargs='+',
+#                     default=['uniform'])
 parser.add_argument('--dataset', metavar='DSET', type=str, default='imagenet')
 parser.add_argument('--arch', metavar='ARCH', default='resnet50')
 parser.add_argument('--transferred_attack_arch', metavar='ARCH', default='resnet152')
 
 # Optimization
-parser.add_argument('--epochs', metavar='N', type=int, default=4)
+parser.add_argument('--epochs', metavar='N', type=int, default=12)
 parser.add_argument('--batch_size', type=int, default=256)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--ft_lr', type=float, default=0.0001)
 parser.add_argument('--momentum', type=float, default=0.9)
+# parser.add_argument('--schedule', type=int, nargs='+', default=[3, 6, 9],
+#                     help='Decrease learning rate at these epochs.')
+# parser.add_argument('--gammas', type=float, nargs='+', default=[0.1, 0.1, 0.1],
+#                     help='LR for psi is multiplied by gamma on schedule')
+# parser.add_argument('--cosine_ft_lr', action='store_true', default=False)
 
 #Regularization
 parser.add_argument('--decay', type=float, default=1e-4,
@@ -62,6 +72,8 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='Evaluate model on test set')
+# parser.add_argument('--generate_adv_samples', action='store_true',
+#                     help='Generate adv samples for pre-trained models')
 
 # Acceleration
 parser.add_argument('--workers', type=int, default=4,
@@ -74,12 +86,34 @@ parser.add_argument('--manualSeed', type=int, default=0, help='manual seed')
 parser.add_argument('--posterior_type', type=str, default='mfg')
 parser.add_argument('--psi_init_range', type=float, nargs='+', default=[-6, -5])
 parser.add_argument('--num_mc_samples', type=int, default=20)
-parser.add_argument('--uncertainty_threshold', type=float, default=0.5)
-parser.add_argument('--epsilon_max_train', type=float, default=2.)
+# parser.add_argument('--num_fake', type=int, default=1000)
+parser.add_argument('--uncertainty_threshold', type=float, default=0.75)
+
+# Adv settings for Training
+# parser.add_argument('--adv_uni_mixup', type=float, default=0.)
+# parser.add_argument('--attack_method_training', type=str, default='BIM')
+# parser.add_argument('--attack_p_training', type=float, default=0.5)
+parser.add_argument('--alpha', type=float, default=1.)
+parser.add_argument('--epsilon_max_train', type=float, default=1.)
 parser.add_argument('--epsilon_min_train', type=float, default=1.)
-parser.add_argument('--blur_prob', type=float, default=0.1)
+# parser.add_argument('--epsilon_schedule', type=str, default='linear')
+
+# Fake generated data augmentation
+parser.add_argument('--sharpen_prob', type=float, default=0.)
+parser.add_argument('--sharpen_param', type=float, default=0.5)
+parser.add_argument('--blur_prob', type=float, default=0.5)
 parser.add_argument('--blur_kernel_size', type=int, nargs='+', default=[3, 5, 7, 9, 11])
 parser.add_argument('--blur_sig', type=float, nargs='+', default=[0., 5.])
+# parser.add_argument('--jpg_prob', type=float, default=0.5)
+# parser.add_argument('--jpg_method', type=str, nargs='+', default=['cv2', 'pil'])
+# parser.add_argument('--jpg_qual', type=int, nargs='+', default=[30, 100])
+
+# Transferred adv samples
+# parser.add_argument('--data_path_adv_val', metavar='DPATH', type=str,
+#                     default='/data/zhijie/autobayes/adv_samples')
+# parser.add_argument('--adv_val_folders', type=str, nargs='+',
+#                     default=['fgsm_resnet_152', 'mim_resnet_152',
+#                              'bim_resnet_152', 'da_resnet_152'])
 
 # Attack settings
 parser.add_argument('--attack_methods', type=str, nargs='+',
@@ -123,7 +157,6 @@ def main():
     args.save_path = args.save_path + job_id
     if not os.path.isdir(args.save_path): os.makedirs(args.save_path)
 
-    # step 0: note to pre-process some hyper-paramters
     args.epsilon_max_train *= args.epsilon
     args.epsilon_min_train *= args.epsilon
 
@@ -159,11 +192,55 @@ def main_worker(gpu, ngpus_per_node, args):
                args.manualSeed, '_eval' if args.evaluate else '')), 'w')
     log = (log, args.gpu)
 
+    net = models.__dict__[args.arch](pretrained=True)
+    disable_dropout(net)
     attack_net = models.__dict__[args.transferred_attack_arch](pretrained=True)
 
-    # step 1: convert the last res-block to be Bayesian
-    net = models.__dict__[args.arch](pretrained=True)
-    # disable_dropout(net) # we may need to disable the dropout (not sure, need try)
+    criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
+
+    # if args.generate_adv_samples:
+    #     if args.distributed:
+    #         if args.multiprocessing_distributed:
+    #             args.rank = args.rank * ngpus_per_node + gpu
+    #         dist.init_process_group(backend=args.dist_backend,
+    #                                 init_method=args.dist_url+":"+args.dist_port,
+    #                                 world_size=args.world_size, rank=args.rank)
+    #         torch.cuda.set_device(args.gpu)
+    #         net.cuda(args.gpu)
+    #         args.batch_size = int(args.batch_size / ngpus_per_node)
+    #         net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[args.gpu])
+    #     else:
+    #         torch.cuda.set_device(args.gpu)
+    #         net = net.cuda(args.gpu)
+    #
+    #     cudnn.benchmark = True
+    #
+    #     train_dataset = torchvision.datasets.ImageFolder(
+    #         os.path.join(args.data_path, 'train'),
+    #         torchvision.transforms.Compose([
+    #             torchvision.transforms.Resize(256),
+    #             torchvision.transforms.CenterCrop(256),
+    #             torchvision.transforms.ToTensor(),
+    #             torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    #                                              std=[0.229, 0.224, 0.225])
+    #         ]))
+    #     rng = np.random.RandomState(0)
+    #     rand_idx = rng.permutation(len(train_dataset.samples))[:50000]
+    #     train_dataset.samples = [train_dataset.samples[i] for i in rand_idx]
+    #     if args.gpu == 0:
+    #         for i, (path, _) in enumerate(train_dataset.samples):
+    #             shutil.copyfile(path, "/data/zhijie/adv_samples/imagenet/origin/all/{}_{}.JPEG".format(i%8, i//8))
+    #     train_dataset.targets = [train_dataset.targets[i] for i in rand_idx]
+    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=False) if args.distributed else None
+    #     train_loader = torch.utils.data.DataLoader(
+    #         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+    #         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    #
+    #     for attack_method in args.attack_methods:
+    #         ens_attack(train_loader, net, criterion, args, log, attack_method)
+    #     torch.distributed.barrier()
+    #     exit()
+
     if args.posterior_type == 'mfg':
         net.layer4[-1].conv1 = to_bayesian_mfg(net.layer4[-1].conv1, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].bn1 = to_bayesian_mfg(net.layer4[-1].bn1, args.psi_init_range, args.num_mc_samples)
@@ -171,11 +248,12 @@ def main_worker(gpu, ngpus_per_node, args):
         net.layer4[-1].bn2 = to_bayesian_mfg(net.layer4[-1].bn2, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].conv3 = to_bayesian_mfg(net.layer4[-1].conv3, args.psi_init_range, args.num_mc_samples)
         net.layer4[-1].bn3 = to_bayesian_mfg(net.layer4[-1].bn3, args.psi_init_range, args.num_mc_samples)
-        # assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
-        # net.layer4[-1].downsample = to_bayesian_mfg(torch.nn.Sequential(
-        #         conv1x1(net.layer4[-1].conv1.in_channels, net.layer4[-1].bn3.num_features, 1),
-        #         torch.nn.BatchNorm2d(net.layer4[-1].bn3.num_features),
-        #     ), args.psi_init_range, args.num_mc_samples, is_residual=True)
+        assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
+        net.layer4[-1].downsample = to_bayesian_mfg(torch.nn.Sequential(
+                conv1x1(net.layer4[-1].conv1.in_channels, net.layer4[-1].bn3.num_features, 1),
+                torch.nn.BatchNorm2d(net.layer4[-1].bn3.num_features),
+            ), args.psi_init_range, args.num_mc_samples, is_residual=True)
+        # net.fc = to_bayesian(net.fc, args.psi_init_range, args.num_mc_samples)
     elif args.posterior_type == 'emp':
         net.layer4[-1].conv1 = to_bayesian_emp(net.layer4[-1].conv1, args.num_mc_samples)
         net.layer4[-1].bn1 = to_bayesian_emp(net.layer4[-1].bn1, args.num_mc_samples)
@@ -183,11 +261,12 @@ def main_worker(gpu, ngpus_per_node, args):
         net.layer4[-1].bn2 = to_bayesian_emp(net.layer4[-1].bn2, args.num_mc_samples)
         net.layer4[-1].conv3 = to_bayesian_emp(net.layer4[-1].conv3, args.num_mc_samples)
         net.layer4[-1].bn3 = to_bayesian_emp(net.layer4[-1].bn3, args.num_mc_samples)
-        # assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
-        # net.layer4[-1].downsample = to_bayesian_emp(torch.nn.Sequential(
-        #         conv1x1(net.layer4[-1].conv1.in_channels, net.layer4[-1].bn3.num_features, 1),
-        #         torch.nn.BatchNorm2d(net.layer4[-1].bn3.num_features),
-        #     ), args.num_mc_samples, is_residual=True)
+        assert(net.layer4[-1].conv1.in_channels == net.layer4[-1].bn3.num_features)
+        net.layer4[-1].downsample = to_bayesian_emp(torch.nn.Sequential(
+                conv1x1(net.layer4[-1].conv1.in_channels, net.layer4[-1].bn3.num_features, 1),
+                torch.nn.BatchNorm2d(net.layer4[-1].bn3.num_features),
+            ), args.num_mc_samples, is_residual=True)
+        # net.fc = to_bayesian(net.fc, args.num_mc_samples)
     else:
         raise NotImplementedError
 
@@ -215,7 +294,6 @@ def main_worker(gpu, ngpus_per_node, args):
         net = net.cuda(args.gpu)
         attack_net = attack_net.cuda(args.gpu)
 
-    # step 2: build optimizers for the pre-trianed and added params
     pre_trained, new_added = [], []
     for name, param in net.named_parameters():
         if (args.posterior_type == 'mfg' and 'psi' in name) \
@@ -257,7 +335,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print_log("=> do not use any checkpoint for the model", log)
 
     cudnn.benchmark = True
-    criterion = torch.nn.CrossEntropyLoss().cuda(args.gpu)
+
     train_loader, test_loader, sub_test_loader = load_dataset_ft(args)
 
     if args.dataset == 'cifar10':
@@ -277,23 +355,31 @@ def main_worker(gpu, ngpus_per_node, args):
             [0.229, 0.224, 0.225])).view(1,3,1,1).cuda(args.gpu).float()
     stack_kernel = gaussian_kernel().cuda(args.gpu)
 
-    # step 2: set the num_data arg for new_added_optimizer if using mean-field Gaussian
     if args.posterior_type == 'mfg':
         new_added_optimizer.num_data = len(train_loader.dataset)
 
     if args.evaluate:
+        # for attack_method in args.attack_methods:
+        #     ens_attack(test_loader,
+        #                net, criterion, mean, std, stack_kernel, args, log, attack_method, attack_model=attack_net)
+        #     if args.gpu == 0:
+        #         print_log('NAT vs. {} from {} --> {}'.format(attack_method + "_transferred", args.transferred_attack_arch, plot_mi(args.save_path, attack_method + "_transferred")), log)
+
         while True:
-            evaluate(test_loader, sub_test_loader,
+            evaluate(train_loader, test_loader, sub_test_loader,
                      net, attack_net, criterion, mean, std, stack_kernel, args, log)
         return
 
     start_time = time.time()
     epoch_time = AverageMeter()
+    # rng = np.random.RandomState(args.manualSeed)
     train_los = -1
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_loader.sampler.set_epoch(epoch)
+            # ood_train_loader.sampler.set_epoch(epoch)
+        # cur_lr, cur_slr = adjust_learning_rate(pre_trained_optimizer, new_added_optimizer, epoch, args)
 
         need_hour, need_mins, need_secs = convert_secs2time(epoch_time.avg * (args.epochs-epoch))
         need_time = '[Need: {:02d}:{:02d}:{:02d}]'.format(need_hour, need_mins, need_secs)
@@ -308,9 +394,14 @@ def main_worker(gpu, ngpus_per_node, args):
         if epoch == args.epochs - 1:
             val_acc, val_los = 0, 0
         else:
-            val_acc, val_los = evaluate(test_loader, sub_test_loader,
+            val_acc, val_los = evaluate(train_loader, test_loader, sub_test_loader,
                                     net, attack_net, criterion, mean, std, stack_kernel, args, log, sub_attack=True)
         recorder.update(epoch, train_los, train_acc, val_los, val_acc)
+
+        # is_best = False
+        # if val_acc > best_acc:
+        #     is_best = True
+        #     best_acc = val_acc
 
         if args.gpu == 0:
             save_checkpoint({
@@ -326,7 +417,7 @@ def main_worker(gpu, ngpus_per_node, args):
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
 
     while True:
-        evaluate(test_loader, sub_test_loader,
+        evaluate(train_loader, test_loader, sub_test_loader,
                  net, attack_net, criterion, mean, std, stack_kernel, args, log)
 
     log[0].close()
@@ -341,7 +432,11 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    # ood_train_loader_iter = iter(ood_train_loader)
+
     model.train()
+
+    beta = torch.distributions.beta.Beta(torch.tensor([args.sharpen_param]).cuda(args.gpu), torch.tensor([args.sharpen_param]).cuda(args.gpu))
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
@@ -352,39 +447,45 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         input = input.cuda(args.gpu, non_blocking=True)
         target = target.cuda(args.gpu, non_blocking=True)
         bs = input.shape[0]
-
-        # step 3: fetch the half of the batch for generating uniformly perturbed samples
         bs1 = bs // 2
-        eps = np.random.uniform(args.epsilon_min_train, args.epsilon_max_train)
-        input1 = input[:bs1].mul(std).add(mean)
-        noise = torch.empty_like(input1).uniform_(-eps, eps)
 
+        eps = np.random.uniform(args.epsilon_min_train, args.epsilon_max_train) #adjust_eps(args)
+        # if rng.uniform() < args.attack_p_training:
+        #     input1 = ens_attack((input[:bs1], target[:bs1]), model, None, mean, std, stack_kernel,
+        #                        args, log, args.attack_method_training)
+        #     model.train()
+        # else:
+        #     # input1 = next(ood_train_loader_iter)
+        #     # input1 = input1.cuda(args.gpu, non_blocking=True)
+        input1 = input[:bs1].mul_(std).add_(mean)
+        noise1 = beta.rsample(input1.shape).squeeze() * 2 * eps - eps
+        noise3 = torch.empty_like(input1).uniform_(-eps, eps)
         gaussian_filter_kernel_size = int(np.random.choice(args.blur_kernel_size))
         gaussian_filter_sigma = np.random.uniform(args.blur_sig[0], args.blur_sig[1])
-        noise_lf = gaussian_blur2d(noise, (gaussian_filter_kernel_size, gaussian_filter_kernel_size), (gaussian_filter_sigma, gaussian_filter_sigma))
+        noise2 = gaussian_blur2d(noise3, (gaussian_filter_kernel_size, gaussian_filter_kernel_size), (gaussian_filter_sigma, gaussian_filter_sigma))
+        # if args.gpu == 0: print(noise1.max(), noise1.min(), noise2.max(), noise2.min(), noise3.max(), noise3.min(),)
 
-        # step 3: using low-frequency noise with probability blur_prob
-        mask = (torch.empty(bs1, device=input.device).random_(100) <
-            args.blur_prob * 100).float().view(-1, 1, 1, 1)
-        noise = noise_lf * mask + noise * (1 - mask)
-
-        # step 3: apply the noise
+        rand = torch.empty(bs1, device=input.device).random_(100)
+        mask1 = (rand < args.sharpen_prob * 100).float().view(-1, 1, 1, 1)
+        mask2 = ((rand >= args.sharpen_prob * 100).float() * (rand < (args.sharpen_prob+args.blur_prob) * 100).float()).view(-1, 1, 1, 1)
+        assert((mask1 + mask2).max().item() <= 1)
+        noise = noise1 * mask1 + noise2 * mask2 + noise3 * (1 - mask1 - mask2)
+        # if np.random.uniform() < args.blur_prob:
+        #
+        #     noise = gaussian_blur2d(noise, (gaussian_filter_kernel_size, gaussian_filter_kernel_size), (gaussian_filter_sigma, gaussian_filter_sigma))
         input1 = noise.add_(input1).clamp_(0, 1).sub_(mean).div_(std)
 
-        # step 4: set mc_sample_id if using empirical distribution (population based)
         if args.posterior_type == 'emp':
             mc_sample_id = np.concatenate([np.random.randint(0, args.num_mc_samples, size=bs),
                 np.stack([np.random.choice(args.num_mc_samples, 2, replace=False) for _ in range(bs1)]).T.reshape(-1)])
             set_mc_sample_id(model, args.num_mc_samples, mc_sample_id)
 
-        # step 5: forward prop for predicted logits of normal data and features of noisy data
         features, output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]), return_features=True)
-
-        # step 6: calculate CE loss and uncertainty loss
         loss = criterion(output[:bs], target)
-        out1_0 = features[bs:bs+bs1]
-        out1_1 = features[bs+bs1:]
-        mi = ((out1_0 - out1_1)**2).mean(dim=[1,2,3])
+
+        out1_0 = features[bs:bs+bs1]#.softmax(-1)
+        out1_1 = features[bs+bs1:]#.softmax(-1)
+        mi = ((out1_0 - out1_1)**2).mean(dim=[1,2,3])#ent((out1_0 + out1_1)/2.) - (ent(out1_0) + ent(out1_1))/2.
         ur_loss = torch.nn.functional.relu(args.uncertainty_threshold - mi).mean()
 
         prec1, prec5 = accuracy(output[:bs], target, topk=(1, 5))
@@ -393,10 +494,9 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         top1.update(prec1.item(), bs)
         top5.update(prec5.item(), bs)
 
-        # step 7: backward prop and perform optimization
         pre_trained_optimizer.zero_grad()
         new_added_optimizer.zero_grad()
-        (loss+ur_loss).backward()
+        (loss+ur_loss*args.alpha).backward() # edit here
         pre_trained_optimizer.step()
         new_added_optimizer.step()
 
@@ -419,12 +519,39 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
     return top1.avg, losses.avg
 
 
-def evaluate(test_loader, sub_test_loader,
+def evaluate(train_loader, test_loader, sub_test_loader,
              net, attack_net, criterion, mean, std, stack_kernel, args, log, sub_attack=False):
 
     top1, top5, val_loss, ens_ece = ens_validate(test_loader, net, criterion, args, log)
     print_log('Parallel ensemble {} TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f},'
               ' ECE: {:.4f}'.format(args.num_mc_samples, top1, top5, val_loss, ens_ece), log)
+
+    # net.train()
+    # with torch.no_grad():
+    #     batch_input = []
+    #     for i, (input, _) in enumerate(train_loader):
+    #         input = input.cuda(args.gpu, non_blocking=True)
+    #         batch_input.append(input)
+    #         if i % 4 == 3:
+    #             batch_input = torch.cat(batch_input)
+    #             if args.posterior_type == 'emp':
+    #                 mc_sample_id = np.random.randint(0, args.num_mc_samples, size=batch_input.size(0))
+    #                 set_mc_sample_id(net, args.num_mc_samples, mc_sample_id)
+    #             net(batch_input)
+    #             batch_input = []
+    #         if i == 999:
+    #             break
+    #
+    # top1, top5, val_loss, ens_ece = ens_validate(test_loader, net, criterion, args, log)
+    # print_log('Parallel ensemble {} TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f},'
+    #           ' ECE: {:.4f}'.format(args.num_mc_samples, top1, top5, val_loss, ens_ece), log)
+    #
+    # args.random = False
+    # ens_attack(sub_test_loader if sub_attack else test_loader,
+    #            net, criterion, args, log, 'PGD')
+    # if args.gpu == 0:
+    #     print_log('NAT vs. PGD w/o RS --> {}'.format(plot_mi(args.save_path, 'PGD')), log)
+    # args.random = True
 
     for attack_method in args.attack_methods:
         ens_attack(sub_test_loader if sub_attack else test_loader,
@@ -440,11 +567,20 @@ def evaluate(test_loader, sub_test_loader,
         if args.gpu == 0:
             print_log('NAT vs. {} from {} --> {}'.format(attack_method + "_transferred", args.transferred_attack_arch, plot_mi(args.save_path, attack_method + "_transferred")), log)
 
+    # if offline_eval:
+    #     for name, adv_loader_ in adv_loaders.items():
+    #         ens_validate(adv_loader_, net, criterion, args, log, suffix='_{}'.format(name))
+    #         if args.gpu == 0:
+    #             print_log('NAT vs. {} --> {}'.format(name, plot_mi(args.save_path, name)), log)
+
+    # ens_validate(fake_loader, net, criterion, args, log, suffix='_fake')
+    # if args.gpu == 0:
+    #     print_log('NAT vs. Fake (BigGAN) --> {}'.format(plot_mi(args.save_path, 'fake')), log)
+
     return top1, val_loss
 
 def ens_validate(val_loader, model, criterion, args, log, suffix=''):
     model.eval()
-    # evaluation/adv attack step 1: enable parallel_eval
     parallel_eval(model)
 
     ece_func = _ECELoss().cuda(args.gpu)
@@ -458,12 +594,11 @@ def ens_validate(val_loader, model, criterion, args, log, suffix=''):
             target = target.cuda(args.gpu, non_blocking=True)
             targets.append(target)
 
-            # evaluation/adv attack step 2: obtain features for estimating uncertainty (mi);
-            # obtain output, which is in the shape [batch_size, num_mc_samples, num_classes]
-            # and need to be transformed via outputs.softmax(-1).mean(-2) to get predicted probability
             features, outputs = model(input, return_features=True)
             assert outputs.dim() == 3
             output = outputs.softmax(-1).mean(-2)
+            # mi = (- output * (output+1e-10).log()).sum(-1) \
+            #     - (-outputs * (outputs+1e-10).log()).sum(-1).mean(-1)
             mi = features.var(dim=1).mean(dim=[1,2,3])
             preds.append(output)
             mis.append(mi)
@@ -503,7 +638,6 @@ def ens_validate(val_loader, model, criterion, args, log, suffix=''):
         np.save(os.path.join(args.save_path, 'mis{}.npy'.format(suffix)),
             mis.data.cpu().numpy())
 
-    # evaluation/adv attack step 3: disable parallel_eval
     disable_parallel_eval(model)
     return top1.item(), top5.item(), val_loss.item(), ens_ece.item() if ens_ece is not None else None
 
@@ -655,6 +789,14 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
         attack_model = model
 
     with torch.no_grad():
+        # # for generating adv samples for training
+        # if isinstance(val_loader, tuple):
+        #     input, target = val_loader
+        #     X_adv = eval('_{}_whitebox'.format(attack_method))(input * std + mean, target, mean, std)
+        #     disable_parallel_eval(model)
+        #     if is_transferred: disable_parallel_eval(attack_model)
+        #     return X_adv.sub_(mean).div_(std)
+
         losses, top1, top5, num_data = 0, 0, 0, 0
         mis = []
         for i, (input, target) in enumerate(val_loader):
@@ -664,9 +806,20 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
             X_adv = eval('_{}_whitebox'.format(attack_method))(input, target, mean, std)
             features, outputs = model(X_adv.sub(mean).div(std), return_features=True)
 
+            # if outputs.dim() == 3:
             output = outputs.softmax(-1).mean(-2)
+            # mi = (- output * (output+1e-10).log()).sum(-1) \
+            #     - (-outputs * (outputs+1e-10).log()).sum(-1).mean(-1)
             mi = features.var(dim=1).mean(dim=[1,2,3])
             mis.append(mi)
+            # else:
+            #     # only works for generating adv samples for pre-trained models
+            #     output = outputs
+            #     X_adv = (X_adv * 255).permute(0, 2, 3, 1).cpu().numpy().astype(np.uint8)
+            #     for j, img in enumerate(X_adv):
+            #         im = Image.fromarray(img, 'RGB')
+            #         im.save("/data/zhijie/adv_samples/{}/{}/all/{}_{}.JPEG".format(
+            #             args.dataset, attack_method, args.gpu, i*args.batch_size+j))
             loss = criterion((output+1e-10).log(), target)
             prec1, prec5 = accuracy(output, target, topk=(1, 5))
 
@@ -682,8 +835,8 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
         top1 = reduce_tensor(top1.data, args)
         top5 = reduce_tensor(top5.data, args)
 
-        mis = torch.cat(mis, 0)
-        if args.distributed: mis = dist_collect(mis)
+        mis = torch.cat(mis, 0)# if len(mis) > 0 else None
+        if args.distributed: mis = dist_collect(mis) # and mis is not None
 
     # print_log('Attack by {}, ensemble TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f}'.format(
         # attack_method, top1.item(), top5.item(), losses.item()), log)
@@ -692,9 +845,34 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
     disable_parallel_eval(model)
     if is_transferred: disable_parallel_eval(attack_model)
 
+# def adjust_learning_rate(pre_trained_optimizer, new_added_optimizer, epoch, args):
+#     lr = args.learning_rate
+#     slr = args.learning_rate
+#     assert len(args.gammas) == len(args.schedule), \
+#         "length of gammas and schedule should be equal"
+#     for (gamma, step) in zip(args.gammas, args.schedule):
+#         if (epoch >= step): slr = slr * gamma
+#         else: break
+#     lr = lr * np.prod(args.gammas)
+#     for param_group in pre_trained_optimizer.param_groups: param_group['lr'] = lr
+#     for param_group in new_added_optimizer.param_groups: param_group['lr'] = slr
+#     return lr, slr
+
 def adjust_learning_rate_per_step(new_added_optimizer, epoch, i, num_ites_per_epoch, args):
-    slr = args.ft_lr + (args.lr - args.ft_lr) * (1 + math.cos(math.pi * (epoch + float(i)/num_ites_per_epoch) / args.epochs)) / 2.
-    for param_group in new_added_optimizer.param_groups: param_group['lr'] = slr
-    return slr
+    # if args.cosine_ft_lr:
+        slr = args.ft_lr + (args.lr - args.ft_lr) * (1 + math.cos(math.pi * (epoch + float(i)/num_ites_per_epoch) / args.epochs)) / 2.
+        for param_group in new_added_optimizer.param_groups: param_group['lr'] = slr
+        return slr
+
+# def adjust_eps(args): #epoch, i, num_ites_per_epoch,
+#     assert args.epsilon >= args.epsilon_min_train
+#     return np.random.uniform(args.epsilon_min_train, args.epsilon)
+    # if args.epsilon_schedule == 'linear':
+    #     return args.epsilon - (epoch + float(i)/num_ites_per_epoch) / args.epochs * (args.epsilon - args.epsilon_min_train)
+    # elif args.epsilon_schedule == 'cosine':
+    #     return args.epsilon_min_train + (args.epsilon - args.epsilon_min_train) * (1 + math.cos(math.pi * (epoch + float(i)/num_ites_per_epoch) / args.epochs)) / 2.
+    # else:
+    #     raise NotImplementedError
 
 if __name__ == '__main__': main()
+

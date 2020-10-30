@@ -1,102 +1,111 @@
-onelayer-emp-u-3-fvar-alpha1-th.5-mineps.5
-Parallel ensemble 20 TOP1: 75.7960, TOP5: 92.6500, LOS: 1.0295, ECE: 0.0644
-NAT vs. FGSM --> AP: 0.9997; TPR: 0.9993 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
-NAT vs. BIM --> AP: 0.9786; TPR: 0.6574 @ FPR=0.0100; TPR: 0.8767 @ FPR=0.0500; TPR: 0.9564 @ FPR=0.1000
-NAT vs. PGD --> AP: 0.9967; TPR: 0.9369 @ FPR=0.0100; TPR: 0.9884 @ FPR=0.0500; TPR: 0.9974 @ FPR=0.1000
-NAT vs. MIM --> AP: 0.9937; TPR: 0.8726 @ FPR=0.0100; TPR: 0.9733 @ FPR=0.0500; TPR: 0.9939 @ FPR=0.1000
-NAT vs. TIM --> AP: 0.9789; TPR: 0.6430 @ FPR=0.0100; TPR: 0.8840 @ FPR=0.0500; TPR: 0.9651 @ FPR=0.1000
-NAT vs. FGSM_L2 --> AP: 0.9894; TPR: 0.8254 @ FPR=0.0100; TPR: 0.9562 @ FPR=0.0500; TPR: 0.9852 @ FPR=0.1000
-NAT vs. BIM_L2 --> AP: 0.9776; TPR: 0.6397 @ FPR=0.0100; TPR: 0.8734 @ FPR=0.0500; TPR: 0.9567 @ FPR=0.1000
-NAT vs. PGD_L2 --> AP: 0.9961; TPR: 0.9232 @ FPR=0.0100; TPR: 0.9854 @ FPR=0.0500; TPR: 0.9957 @ FPR=0.1000
-NAT vs. PGD_transferred from resnet152 --> AP: 0.9992; TPR: 0.9962 @ FPR=0.0100; TPR: 0.9994 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
-NAT vs. MIM_transferred from resnet152 --> AP: 0.9990; TPR: 0.9882 @ FPR=0.0100; TPR: 0.9975 @ FPR=0.0500; TPR: 0.9993 @ FPR=0.1000
-NAT vs. TIM_transferred from resnet152 --> AP: 0.9180; TPR: 0.2986 @ FPR=0.0100; TPR: 0.5883 @ FPR=0.0500; TPR: 0.7753 @ FPR=0.1000
+'''
+    onelayer-emp-u-3-fvar-alpha1-th.5-mineps.5
+    Parallel ensemble 20 TOP1: 75.7960, TOP5: 92.6500, LOS: 1.0295, ECE: 0.0644
+    NAT vs. FGSM --> AP: 0.9997; TPR: 0.9993 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
+    NAT vs. BIM --> AP: 0.9786; TPR: 0.6574 @ FPR=0.0100; TPR: 0.8767 @ FPR=0.0500; TPR: 0.9564 @ FPR=0.1000
+    NAT vs. PGD --> AP: 0.9967; TPR: 0.9369 @ FPR=0.0100; TPR: 0.9884 @ FPR=0.0500; TPR: 0.9974 @ FPR=0.1000
+    NAT vs. MIM --> AP: 0.9937; TPR: 0.8726 @ FPR=0.0100; TPR: 0.9733 @ FPR=0.0500; TPR: 0.9939 @ FPR=0.1000
+    NAT vs. TIM --> AP: 0.9789; TPR: 0.6430 @ FPR=0.0100; TPR: 0.8840 @ FPR=0.0500; TPR: 0.9651 @ FPR=0.1000
+    NAT vs. FGSM_L2 --> AP: 0.9894; TPR: 0.8254 @ FPR=0.0100; TPR: 0.9562 @ FPR=0.0500; TPR: 0.9852 @ FPR=0.1000
+    NAT vs. BIM_L2 --> AP: 0.9776; TPR: 0.6397 @ FPR=0.0100; TPR: 0.8734 @ FPR=0.0500; TPR: 0.9567 @ FPR=0.1000
+    NAT vs. PGD_L2 --> AP: 0.9961; TPR: 0.9232 @ FPR=0.0100; TPR: 0.9854 @ FPR=0.0500; TPR: 0.9957 @ FPR=0.1000
+    NAT vs. PGD_transferred from resnet152 --> AP: 0.9992; TPR: 0.9962 @ FPR=0.0100; TPR: 0.9994 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+    NAT vs. MIM_transferred from resnet152 --> AP: 0.9990; TPR: 0.9882 @ FPR=0.0100; TPR: 0.9975 @ FPR=0.0500; TPR: 0.9993 @ FPR=0.1000
+    NAT vs. TIM_transferred from resnet152 --> AP: 0.9180; TPR: 0.2986 @ FPR=0.0100; TPR: 0.5883 @ FPR=0.0500; TPR: 0.7753 @ FPR=0.1000
 
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-5-fvar-alpha1-th.5-mineps.5-maxeps2-sharpen.2.5 --num_mc_samples 20 --posterior_type emp --epochs 5 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 0.5 --lr 0.001 --blur_prob 0 --epsilon_max_train 2 --sharpen_prob 0.2 --sharpen_param 0.5
-Parallel ensemble 20 TOP1: 75.9140, TOP5: 92.7920, LOS: 1.0170, ECE: 0.0669
-NAT vs. FGSM --> AP: 0.9999; TPR: 0.9997 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
-NAT vs. BIM --> AP: 0.9915; TPR: 0.8501 @ FPR=0.0100; TPR: 0.9662 @ FPR=0.0500; TPR: 0.9865 @ FPR=0.1000
-NAT vs. PGD --> AP: 0.9974; TPR: 0.9569 @ FPR=0.0100; TPR: 0.9936 @ FPR=0.0500; TPR: 0.9974 @ FPR=0.1000
-NAT vs. MIM --> AP: 0.9976; TPR: 0.9578 @ FPR=0.0100; TPR: 0.9953 @ FPR=0.0500; TPR: 0.9988 @ FPR=0.1000
-NAT vs. TIM --> AP: 0.9914; TPR: 0.8413 @ FPR=0.0100; TPR: 0.9708 @ FPR=0.0500; TPR: 0.9886 @ FPR=0.1000
-NAT vs. FGSM_L2 --> AP: 0.9906; TPR: 0.8539 @ FPR=0.0100; TPR: 0.9662 @ FPR=0.0500; TPR: 0.9850 @ FPR=0.1000
-NAT vs. BIM_L2 --> AP: 0.9919; TPR: 0.8547 @ FPR=0.0100; TPR: 0.9699 @ FPR=0.0500; TPR: 0.9881 @ FPR=0.1000
-NAT vs. PGD_L2 --> AP: 0.9971; TPR: 0.9514 @ FPR=0.0100; TPR: 0.9922 @ FPR=0.0500; TPR: 0.9970 @ FPR=0.1000
-NAT vs. PGD_transferred from resnet152 --> AP: 0.9994; TPR: 0.9958 @ FPR=0.0100; TPR: 0.9990 @ FPR=0.0500; TPR: 0.9994 @ FPR=0.1000
-NAT vs. MIM_transferred from resnet152 --> AP: 0.9991; TPR: 0.9872 @ FPR=0.0100; TPR: 0.9972 @ FPR=0.0500; TPR: 0.9987 @ FPR=0.1000
-NAT vs. TIM_transferred from resnet152 --> AP: 0.9216; TPR: 0.3421 @ FPR=0.0100; TPR: 0.6550 @ FPR=0.0500; TPR: 0.7908 @ FPR=0.1000
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-5-fvar-alpha1-th.5-mineps.5-maxeps2-sharpen.2.5 --num_mc_samples 20 --posterior_type emp --epochs 5 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 0.5 --lr 0.001 --blur_prob 0 --epsilon_max_train 2 --sharpen_prob 0.2 --sharpen_param 0.5
+    Parallel ensemble 20 TOP1: 75.9140, TOP5: 92.7920, LOS: 1.0170, ECE: 0.0669
+    NAT vs. FGSM --> AP: 0.9999; TPR: 0.9997 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
+    NAT vs. BIM --> AP: 0.9915; TPR: 0.8501 @ FPR=0.0100; TPR: 0.9662 @ FPR=0.0500; TPR: 0.9865 @ FPR=0.1000
+    NAT vs. PGD --> AP: 0.9974; TPR: 0.9569 @ FPR=0.0100; TPR: 0.9936 @ FPR=0.0500; TPR: 0.9974 @ FPR=0.1000
+    NAT vs. MIM --> AP: 0.9976; TPR: 0.9578 @ FPR=0.0100; TPR: 0.9953 @ FPR=0.0500; TPR: 0.9988 @ FPR=0.1000
+    NAT vs. TIM --> AP: 0.9914; TPR: 0.8413 @ FPR=0.0100; TPR: 0.9708 @ FPR=0.0500; TPR: 0.9886 @ FPR=0.1000
+    NAT vs. FGSM_L2 --> AP: 0.9906; TPR: 0.8539 @ FPR=0.0100; TPR: 0.9662 @ FPR=0.0500; TPR: 0.9850 @ FPR=0.1000
+    NAT vs. BIM_L2 --> AP: 0.9919; TPR: 0.8547 @ FPR=0.0100; TPR: 0.9699 @ FPR=0.0500; TPR: 0.9881 @ FPR=0.1000
+    NAT vs. PGD_L2 --> AP: 0.9971; TPR: 0.9514 @ FPR=0.0100; TPR: 0.9922 @ FPR=0.0500; TPR: 0.9970 @ FPR=0.1000
+    NAT vs. PGD_transferred from resnet152 --> AP: 0.9994; TPR: 0.9958 @ FPR=0.0100; TPR: 0.9990 @ FPR=0.0500; TPR: 0.9994 @ FPR=0.1000
+    NAT vs. MIM_transferred from resnet152 --> AP: 0.9991; TPR: 0.9872 @ FPR=0.0100; TPR: 0.9972 @ FPR=0.0500; TPR: 0.9987 @ FPR=0.1000
+    NAT vs. TIM_transferred from resnet152 --> AP: 0.9216; TPR: 0.3421 @ FPR=0.0100; TPR: 0.6550 @ FPR=0.0500; TPR: 0.7908 @ FPR=0.1000
 
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-5-fvar-alpha1-th.5-mineps.5-maxeps2 --num_mc_samples 20 --posterior_type emp --epochs 5 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 0.5 --lr 0.001 --blur_prob 0 --epsilon_max_train 2
-Parallel ensemble 20 TOP1: 76.0480, TOP5: 92.8920, LOS: 1.0239, ECE: 0.0690
-NAT vs. FGSM --> AP: 0.9999; TPR: 0.9999 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
-NAT vs. BIM --> AP: 0.9899; TPR: 0.8112 @ FPR=0.0100; TPR: 0.9576 @ FPR=0.0500; TPR: 0.9836 @ FPR=0.1000
-NAT vs. PGD --> AP: 0.9971; TPR: 0.9464 @ FPR=0.0100; TPR: 0.9916 @ FPR=0.0500; TPR: 0.9971 @ FPR=0.1000
-NAT vs. MIM --> AP: 0.9974; TPR: 0.9450 @ FPR=0.0100; TPR: 0.9948 @ FPR=0.0500; TPR: 0.9989 @ FPR=0.1000
-NAT vs. TIM --> AP: 0.9898; TPR: 0.7947 @ FPR=0.0100; TPR: 0.9605 @ FPR=0.0500; TPR: 0.9874 @ FPR=0.1000
-NAT vs. FGSM_L2 --> AP: 0.9868; TPR: 0.7944 @ FPR=0.0100; TPR: 0.9446 @ FPR=0.0500; TPR: 0.9752 @ FPR=0.1000
-NAT vs. BIM_L2 --> AP: 0.9899; TPR: 0.8072 @ FPR=0.0100; TPR: 0.9596 @ FPR=0.0500; TPR: 0.9851 @ FPR=0.1000
-NAT vs. PGD_L2 --> AP: 0.9969; TPR: 0.9384 @ FPR=0.0100; TPR: 0.9916 @ FPR=0.0500; TPR: 0.9971 @ FPR=0.1000
-NAT vs. PGD_transferred from resnet152 --> AP: 0.9995; TPR: 0.9942 @ FPR=0.0100; TPR: 0.9990 @ FPR=0.0500; TPR: 0.9997 @ FPR=0.1000
-NAT vs. MIM_transferred from resnet152 --> AP: 0.9987; TPR: 0.9791 @ FPR=0.0100; TPR: 0.9950 @ FPR=0.0500; TPR: 0.9980 @ FPR=0.1000
-NAT vs. TIM_transferred from resnet152 --> AP: 0.9045; TPR: 0.2739 @ FPR=0.0100; TPR: 0.5889 @ FPR=0.0500; TPR: 0.7472 @ FPR=0.1000
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-5-fvar-alpha1-th.5-mineps.5-maxeps2 --num_mc_samples 20 --posterior_type emp --epochs 5 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 0.5 --lr 0.001 --blur_prob 0 --epsilon_max_train 2
+    Parallel ensemble 20 TOP1: 76.0480, TOP5: 92.8920, LOS: 1.0239, ECE: 0.0690
+    NAT vs. FGSM --> AP: 0.9999; TPR: 0.9999 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
+    NAT vs. BIM --> AP: 0.9899; TPR: 0.8112 @ FPR=0.0100; TPR: 0.9576 @ FPR=0.0500; TPR: 0.9836 @ FPR=0.1000
+    NAT vs. PGD --> AP: 0.9971; TPR: 0.9464 @ FPR=0.0100; TPR: 0.9916 @ FPR=0.0500; TPR: 0.9971 @ FPR=0.1000
+    NAT vs. MIM --> AP: 0.9974; TPR: 0.9450 @ FPR=0.0100; TPR: 0.9948 @ FPR=0.0500; TPR: 0.9989 @ FPR=0.1000
+    NAT vs. TIM --> AP: 0.9898; TPR: 0.7947 @ FPR=0.0100; TPR: 0.9605 @ FPR=0.0500; TPR: 0.9874 @ FPR=0.1000
+    NAT vs. FGSM_L2 --> AP: 0.9868; TPR: 0.7944 @ FPR=0.0100; TPR: 0.9446 @ FPR=0.0500; TPR: 0.9752 @ FPR=0.1000
+    NAT vs. BIM_L2 --> AP: 0.9899; TPR: 0.8072 @ FPR=0.0100; TPR: 0.9596 @ FPR=0.0500; TPR: 0.9851 @ FPR=0.1000
+    NAT vs. PGD_L2 --> AP: 0.9969; TPR: 0.9384 @ FPR=0.0100; TPR: 0.9916 @ FPR=0.0500; TPR: 0.9971 @ FPR=0.1000
+    NAT vs. PGD_transferred from resnet152 --> AP: 0.9995; TPR: 0.9942 @ FPR=0.0100; TPR: 0.9990 @ FPR=0.0500; TPR: 0.9997 @ FPR=0.1000
+    NAT vs. MIM_transferred from resnet152 --> AP: 0.9987; TPR: 0.9791 @ FPR=0.0100; TPR: 0.9950 @ FPR=0.0500; TPR: 0.9980 @ FPR=0.1000
+    NAT vs. TIM_transferred from resnet152 --> AP: 0.9045; TPR: 0.2739 @ FPR=0.0100; TPR: 0.5889 @ FPR=0.0500; TPR: 0.7472 @ FPR=0.1000
 
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-4-fvar-alpha1-th.5-mineps1-maxeps2-sharpen0-blur.1 --num_mc_samples 20 --posterior_type emp --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0.1 --epsilon_max_train 2 --sharpen_prob 0 --sharpen_param 0.5 (gpu28)
-Parallel ensemble 20 TOP1: 75.8700, TOP5: 92.8260, LOS: 1.0182, ECE: 0.0635
-NAT vs. FGSM --> AP: 0.9937; TPR: 0.9765 @ FPR=0.0100; TPR: 0.9993 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
-NAT vs. BIM --> AP: 0.9900; TPR: 0.8549 @ FPR=0.0100; TPR: 0.9490 @ FPR=0.0500; TPR: 0.9730 @ FPR=0.1000
-NAT vs. PGD --> AP: 0.9922; TPR: 0.8671 @ FPR=0.0100; TPR: 0.9627 @ FPR=0.0500; TPR: 0.9829 @ FPR=0.1000
-NAT vs. MIM --> AP: 0.9971; TPR: 0.9470 @ FPR=0.0100; TPR: 0.9876 @ FPR=0.0500; TPR: 0.9952 @ FPR=0.1000
-NAT vs. TIM --> AP: 0.9974; TPR: 0.9553 @ FPR=0.0100; TPR: 0.9887 @ FPR=0.0500; TPR: 0.9949 @ FPR=0.1000
-NAT vs. FGSM_L2 --> AP: 0.9937; TPR: 0.9082 @ FPR=0.0100; TPR: 0.9788 @ FPR=0.0500; TPR: 0.9896 @ FPR=0.1000
-NAT vs. BIM_L2 --> AP: 0.9912; TPR: 0.8630 @ FPR=0.0100; TPR: 0.9559 @ FPR=0.0500; TPR: 0.9783 @ FPR=0.1000
-NAT vs. PGD_L2 --> AP: 0.9928; TPR: 0.8784 @ FPR=0.0100; TPR: 0.9667 @ FPR=0.0500; TPR: 0.9850 @ FPR=0.1000
-NAT vs. PGD_transferred from resnet152 --> AP: 0.9941; TPR: 0.9169 @ FPR=0.0100; TPR: 0.9874 @ FPR=0.0500; TPR: 0.9939 @ FPR=0.1000
-NAT vs. MIM_transferred from resnet152 --> AP: 0.9963; TPR: 0.9557 @ FPR=0.0100; TPR: 0.9923 @ FPR=0.0500; TPR: 0.9962 @ FPR=0.1000
-NAT vs. TIM_transferred from resnet152 --> AP: 0.9978; TPR: 0.9699 @ FPR=0.0100; TPR: 0.9905 @ FPR=0.0500; TPR: 0.9948 @ FPR=0.1000
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-4-fvar-alpha1-th.5-mineps1-maxeps2-sharpen0-blur.1 --num_mc_samples 20 --posterior_type emp --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0.1 --epsilon_max_train 2 --sharpen_prob 0 --sharpen_param 0.5 (gpu28)
+    Parallel ensemble 20 TOP1: 75.8700, TOP5: 92.8260, LOS: 1.0182, ECE: 0.0635
+    NAT vs. FGSM --> AP: 0.9937; TPR: 0.9765 @ FPR=0.0100; TPR: 0.9993 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+    NAT vs. BIM --> AP: 0.9900; TPR: 0.8549 @ FPR=0.0100; TPR: 0.9490 @ FPR=0.0500; TPR: 0.9730 @ FPR=0.1000
+    NAT vs. PGD --> AP: 0.9922; TPR: 0.8671 @ FPR=0.0100; TPR: 0.9627 @ FPR=0.0500; TPR: 0.9829 @ FPR=0.1000
+    NAT vs. MIM --> AP: 0.9971; TPR: 0.9470 @ FPR=0.0100; TPR: 0.9876 @ FPR=0.0500; TPR: 0.9952 @ FPR=0.1000
+    NAT vs. TIM --> AP: 0.9974; TPR: 0.9553 @ FPR=0.0100; TPR: 0.9887 @ FPR=0.0500; TPR: 0.9949 @ FPR=0.1000
+    NAT vs. FGSM_L2 --> AP: 0.9937; TPR: 0.9082 @ FPR=0.0100; TPR: 0.9788 @ FPR=0.0500; TPR: 0.9896 @ FPR=0.1000
+    NAT vs. BIM_L2 --> AP: 0.9912; TPR: 0.8630 @ FPR=0.0100; TPR: 0.9559 @ FPR=0.0500; TPR: 0.9783 @ FPR=0.1000
+    NAT vs. PGD_L2 --> AP: 0.9928; TPR: 0.8784 @ FPR=0.0100; TPR: 0.9667 @ FPR=0.0500; TPR: 0.9850 @ FPR=0.1000
+    NAT vs. PGD_transferred from resnet152 --> AP: 0.9941; TPR: 0.9169 @ FPR=0.0100; TPR: 0.9874 @ FPR=0.0500; TPR: 0.9939 @ FPR=0.1000
+    NAT vs. MIM_transferred from resnet152 --> AP: 0.9963; TPR: 0.9557 @ FPR=0.0100; TPR: 0.9923 @ FPR=0.0500; TPR: 0.9962 @ FPR=0.1000
+    NAT vs. TIM_transferred from resnet152 --> AP: 0.9978; TPR: 0.9699 @ FPR=0.0100; TPR: 0.9905 @ FPR=0.0500; TPR: 0.9948 @ FPR=0.1000
 
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-mfg-u-4-fvar-alpha1-th.5-mineps1-maxeps2-sharpen0-blur.1 --num_mc_samples 20 --posterior_type mfg --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0.1 --epsilon_max_train 2 --sharpen_prob 0 --sharpen_param 0.5 (gpu28)
-Parallel ensemble 20 TOP1: 75.8920, TOP5: 92.7380, LOS: 1.0004, ECE: 0.0527
-NAT vs. FGSM --> AP: 0.8188; TPR: 0.0002 @ FPR=0.0100; TPR: 0.1030 @ FPR=0.0500; TPR: 0.9357 @ FPR=0.1000
-NAT vs. BIM --> AP: 0.9592; TPR: 0.6581 @ FPR=0.0100; TPR: 0.7452 @ FPR=0.0500; TPR: 0.8034 @ FPR=0.1000
-NAT vs. PGD --> AP: 0.9760; TPR: 0.7629 @ FPR=0.0100; TPR: 0.8614 @ FPR=0.0500; TPR: 0.9000 @ FPR=0.1000
-NAT vs. MIM --> AP: 0.9835; TPR: 0.8279 @ FPR=0.0100; TPR: 0.8823 @ FPR=0.0500; TPR: 0.9156 @ FPR=0.1000
-NAT vs. TIM --> AP: 0.9835; TPR: 0.8162 @ FPR=0.0100; TPR: 0.8825 @ FPR=0.0500; TPR: 0.9185 @ FPR=0.1000
-NAT vs. FGSM_L2 --> AP: 0.8491; TPR: 0.0178 @ FPR=0.0100; TPR: 0.3510 @ FPR=0.0500; TPR: 0.8537 @ FPR=0.1000
-NAT vs. BIM_L2 --> AP: 0.9609; TPR: 0.6508 @ FPR=0.0100; TPR: 0.7470 @ FPR=0.0500; TPR: 0.8137 @ FPR=0.1000
-NAT vs. PGD_L2 --> AP: 0.9789; TPR: 0.7635 @ FPR=0.0100; TPR: 0.8679 @ FPR=0.0500; TPR: 0.9125 @ FPR=0.1000
-NAT vs. PGD_transferred from resnet152 --> AP: 0.8665; TPR: 0.0171 @ FPR=0.0100; TPR: 0.4066 @ FPR=0.0500; TPR: 0.9219 @ FPR=0.1000
-NAT vs. MIM_transferred from resnet152 --> AP: 0.8663; TPR: 0.0213 @ FPR=0.0100; TPR: 0.3712 @ FPR=0.0500; TPR: 0.9372 @ FPR=0.1000
-NAT vs. TIM_transferred from resnet152 --> AP: 0.8952; TPR: 0.0468 @ FPR=0.0100; TPR: 0.5410 @ FPR=0.0500; TPR: 0.9536 @ FPR=0.1000
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-mfg-u-4-fvar-alpha1-th.5-mineps1-maxeps2-sharpen0-blur.1 --num_mc_samples 20 --posterior_type mfg --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0.1 --epsilon_max_train 2 --sharpen_prob 0 --sharpen_param 0.5 (gpu28)
+    Parallel ensemble 20 TOP1: 75.8920, TOP5: 92.7380, LOS: 1.0004, ECE: 0.0527
+    NAT vs. FGSM --> AP: 0.8188; TPR: 0.0002 @ FPR=0.0100; TPR: 0.1030 @ FPR=0.0500; TPR: 0.9357 @ FPR=0.1000
+    NAT vs. BIM --> AP: 0.9592; TPR: 0.6581 @ FPR=0.0100; TPR: 0.7452 @ FPR=0.0500; TPR: 0.8034 @ FPR=0.1000
+    NAT vs. PGD --> AP: 0.9760; TPR: 0.7629 @ FPR=0.0100; TPR: 0.8614 @ FPR=0.0500; TPR: 0.9000 @ FPR=0.1000
+    NAT vs. MIM --> AP: 0.9835; TPR: 0.8279 @ FPR=0.0100; TPR: 0.8823 @ FPR=0.0500; TPR: 0.9156 @ FPR=0.1000
+    NAT vs. TIM --> AP: 0.9835; TPR: 0.8162 @ FPR=0.0100; TPR: 0.8825 @ FPR=0.0500; TPR: 0.9185 @ FPR=0.1000
+    NAT vs. FGSM_L2 --> AP: 0.8491; TPR: 0.0178 @ FPR=0.0100; TPR: 0.3510 @ FPR=0.0500; TPR: 0.8537 @ FPR=0.1000
+    NAT vs. BIM_L2 --> AP: 0.9609; TPR: 0.6508 @ FPR=0.0100; TPR: 0.7470 @ FPR=0.0500; TPR: 0.8137 @ FPR=0.1000
+    NAT vs. PGD_L2 --> AP: 0.9789; TPR: 0.7635 @ FPR=0.0100; TPR: 0.8679 @ FPR=0.0500; TPR: 0.9125 @ FPR=0.1000
+    NAT vs. PGD_transferred from resnet152 --> AP: 0.8665; TPR: 0.0171 @ FPR=0.0100; TPR: 0.4066 @ FPR=0.0500; TPR: 0.9219 @ FPR=0.1000
+    NAT vs. MIM_transferred from resnet152 --> AP: 0.8663; TPR: 0.0213 @ FPR=0.0100; TPR: 0.3712 @ FPR=0.0500; TPR: 0.9372 @ FPR=0.1000
+    NAT vs. TIM_transferred from resnet152 --> AP: 0.8952; TPR: 0.0468 @ FPR=0.0100; TPR: 0.5410 @ FPR=0.0500; TPR: 0.9536 @ FPR=0.1000
 
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-4-fvar-alpha1-th.5-mineps1-maxeps2-sharpen0-blur.05 --num_mc_samples 20 --posterior_type emp --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0.05 --epsilon_max_train 2 --sharpen_prob 0 --sharpen_param 0.5
-Parallel ensemble 20 TOP1: 75.7960, TOP5: 92.7700, LOS: 1.0118, ECE: 0.0609
-NAT vs. FGSM --> AP: 0.9972; TPR: 0.9953 @ FPR=0.0100; TPR: 0.9997 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
-NAT vs. BIM --> AP: 0.9860; TPR: 0.7868 @ FPR=0.0100; TPR: 0.9189 @ FPR=0.0500; TPR: 0.9614 @ FPR=0.1000
-NAT vs. PGD --> AP: 0.9928; TPR: 0.8716 @ FPR=0.0100; TPR: 0.9624 @ FPR=0.0500; TPR: 0.9850 @ FPR=0.1000
-NAT vs. MIM --> AP: 0.9971; TPR: 0.9399 @ FPR=0.0100; TPR: 0.9869 @ FPR=0.0500; TPR: 0.9956 @ FPR=0.1000
-NAT vs. TIM --> AP: 0.9971; TPR: 0.9445 @ FPR=0.0100; TPR: 0.9862 @ FPR=0.0500; TPR: 0.9949 @ FPR=0.1000
-NAT vs. FGSM_L2 --> AP: 0.9928; TPR: 0.8769 @ FPR=0.0100; TPR: 0.9690 @ FPR=0.0500; TPR: 0.9877 @ FPR=0.1000
-NAT vs. BIM_L2 --> AP: 0.9869; TPR: 0.7961 @ FPR=0.0100; TPR: 0.9245 @ FPR=0.0500; TPR: 0.9649 @ FPR=0.1000
-NAT vs. PGD_L2 --> AP: 0.9927; TPR: 0.8688 @ FPR=0.0100; TPR: 0.9640 @ FPR=0.0500; TPR: 0.9861 @ FPR=0.1000
-NAT vs. PGD_transferred from resnet152 --> AP: 0.9967; TPR: 0.9452 @ FPR=0.0100; TPR: 0.9907 @ FPR=0.0500; TPR: 0.9966 @ FPR=0.1000
-NAT vs. MIM_transferred from resnet152 --> AP: 0.9974; TPR: 0.9625 @ FPR=0.0100; TPR: 0.9914 @ FPR=0.0500; TPR: 0.9964 @ FPR=0.1000
-NAT vs. TIM_transferred from resnet152 --> AP: 0.9961; TPR: 0.9384 @ FPR=0.0100; TPR: 0.9807 @ FPR=0.0500; TPR: 0.9913 @ FPR=0.1000
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-4-fvar-alpha1-th.5-mineps1-maxeps2-sharpen0-blur.05 --num_mc_samples 20 --posterior_type emp --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0.05 --epsilon_max_train 2 --sharpen_prob 0 --sharpen_param 0.5
+    Parallel ensemble 20 TOP1: 75.7960, TOP5: 92.7700, LOS: 1.0118, ECE: 0.0609
+    NAT vs. FGSM --> AP: 0.9972; TPR: 0.9953 @ FPR=0.0100; TPR: 0.9997 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
+    NAT vs. BIM --> AP: 0.9860; TPR: 0.7868 @ FPR=0.0100; TPR: 0.9189 @ FPR=0.0500; TPR: 0.9614 @ FPR=0.1000
+    NAT vs. PGD --> AP: 0.9928; TPR: 0.8716 @ FPR=0.0100; TPR: 0.9624 @ FPR=0.0500; TPR: 0.9850 @ FPR=0.1000
+    NAT vs. MIM --> AP: 0.9971; TPR: 0.9399 @ FPR=0.0100; TPR: 0.9869 @ FPR=0.0500; TPR: 0.9956 @ FPR=0.1000
+    NAT vs. TIM --> AP: 0.9971; TPR: 0.9445 @ FPR=0.0100; TPR: 0.9862 @ FPR=0.0500; TPR: 0.9949 @ FPR=0.1000
+    NAT vs. FGSM_L2 --> AP: 0.9928; TPR: 0.8769 @ FPR=0.0100; TPR: 0.9690 @ FPR=0.0500; TPR: 0.9877 @ FPR=0.1000
+    NAT vs. BIM_L2 --> AP: 0.9869; TPR: 0.7961 @ FPR=0.0100; TPR: 0.9245 @ FPR=0.0500; TPR: 0.9649 @ FPR=0.1000
+    NAT vs. PGD_L2 --> AP: 0.9927; TPR: 0.8688 @ FPR=0.0100; TPR: 0.9640 @ FPR=0.0500; TPR: 0.9861 @ FPR=0.1000
+    NAT vs. PGD_transferred from resnet152 --> AP: 0.9967; TPR: 0.9452 @ FPR=0.0100; TPR: 0.9907 @ FPR=0.0500; TPR: 0.9966 @ FPR=0.1000
+    NAT vs. MIM_transferred from resnet152 --> AP: 0.9974; TPR: 0.9625 @ FPR=0.0100; TPR: 0.9914 @ FPR=0.0500; TPR: 0.9964 @ FPR=0.1000
+    NAT vs. TIM_transferred from resnet152 --> AP: 0.9961; TPR: 0.9384 @ FPR=0.0100; TPR: 0.9807 @ FPR=0.0500; TPR: 0.9913 @ FPR=0.1000
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-4-fvar-alpha1-th.5-mineps1-maxeps2 --num_mc_samples 20 --posterior_type emp --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0 --epsilon_max_train 2
-Parallel ensemble 20 TOP1: 75.8760, TOP5: 92.7880, LOS: 1.0203, ECE: 0.0654
-NAT vs. FGSM --> AP: 1.0000; TPR: 1.0000 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
-NAT vs. BIM --> AP: 0.9881; TPR: 0.7612 @ FPR=0.0100; TPR: 0.9608 @ FPR=0.0500; TPR: 0.9863 @ FPR=0.1000
-NAT vs. PGD --> AP: 0.9956; TPR: 0.9145 @ FPR=0.0100; TPR: 0.9898 @ FPR=0.0500; TPR: 0.9964 @ FPR=0.1000
-NAT vs. MIM --> AP: 0.9972; TPR: 0.9424 @ FPR=0.0100; TPR: 0.9972 @ FPR=0.0500; TPR: 0.9996 @ FPR=0.1000
-NAT vs. TIM --> AP: 0.9891; TPR: 0.7713 @ FPR=0.0100; TPR: 0.9710 @ FPR=0.0500; TPR: 0.9909 @ FPR=0.1000
-NAT vs. FGSM_L2 --> AP: 0.9916; TPR: 0.8426 @ FPR=0.0100; TPR: 0.9712 @ FPR=0.0500; TPR: 0.9882 @ FPR=0.1000
-NAT vs. BIM_L2 --> AP: 0.9879; TPR: 0.7591 @ FPR=0.0100; TPR: 0.9631 @ FPR=0.0500; TPR: 0.9867 @ FPR=0.1000
-NAT vs. PGD_L2 --> AP: 0.9955; TPR: 0.9155 @ FPR=0.0100; TPR: 0.9900 @ FPR=0.0500; TPR: 0.9962 @ FPR=0.1000
-NAT vs. PGD_transferred from resnet152 --> AP: 0.9983; TPR: 0.9766 @ FPR=0.0100; TPR: 0.9971 @ FPR=0.0500; TPR: 0.9990 @ FPR=0.1000
-NAT vs. MIM_transferred from resnet152 --> AP: 0.9976; TPR: 0.9567 @ FPR=0.0100; TPR: 0.9915 @ FPR=0.0500; TPR: 0.9963 @ FPR=0.1000
-NAT vs. TIM_transferred from resnet152 --> AP: 0.9103; TPR: 0.2672 @ FPR=0.0100; TPR: 0.6236 @ FPR=0.0500; TPR: 0.7743 @ FPR=0.1000
+    CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id onelayer-emp-u-4-fvar-alpha1-th.5-mineps1-maxeps2 --num_mc_samples 20 --posterior_type emp --epochs 4 --alpha 1 --uncertainty_threshold 0.5 --epsilon_min_train 1 --lr 0.001 --blur_prob 0 --epsilon_max_train 2
+    Parallel ensemble 20 TOP1: 75.8760, TOP5: 92.7880, LOS: 1.0203, ECE: 0.0654
+    NAT vs. FGSM --> AP: 1.0000; TPR: 1.0000 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
+    NAT vs. BIM --> AP: 0.9881; TPR: 0.7612 @ FPR=0.0100; TPR: 0.9608 @ FPR=0.0500; TPR: 0.9863 @ FPR=0.1000
+    NAT vs. PGD --> AP: 0.9956; TPR: 0.9145 @ FPR=0.0100; TPR: 0.9898 @ FPR=0.0500; TPR: 0.9964 @ FPR=0.1000
+    NAT vs. MIM --> AP: 0.9972; TPR: 0.9424 @ FPR=0.0100; TPR: 0.9972 @ FPR=0.0500; TPR: 0.9996 @ FPR=0.1000
+    NAT vs. TIM --> AP: 0.9891; TPR: 0.7713 @ FPR=0.0100; TPR: 0.9710 @ FPR=0.0500; TPR: 0.9909 @ FPR=0.1000
+    NAT vs. FGSM_L2 --> AP: 0.9916; TPR: 0.8426 @ FPR=0.0100; TPR: 0.9712 @ FPR=0.0500; TPR: 0.9882 @ FPR=0.1000
+    NAT vs. BIM_L2 --> AP: 0.9879; TPR: 0.7591 @ FPR=0.0100; TPR: 0.9631 @ FPR=0.0500; TPR: 0.9867 @ FPR=0.1000
+    NAT vs. PGD_L2 --> AP: 0.9955; TPR: 0.9155 @ FPR=0.0100; TPR: 0.9900 @ FPR=0.0500; TPR: 0.9962 @ FPR=0.1000
+    NAT vs. PGD_transferred from resnet152 --> AP: 0.9983; TPR: 0.9766 @ FPR=0.0100; TPR: 0.9971 @ FPR=0.0500; TPR: 0.9990 @ FPR=0.1000
+    NAT vs. MIM_transferred from resnet152 --> AP: 0.9976; TPR: 0.9567 @ FPR=0.0100; TPR: 0.9915 @ FPR=0.0500; TPR: 0.9963 @ FPR=0.1000
+    NAT vs. TIM_transferred from resnet152 --> AP: 0.9103; TPR: 0.2672 @ FPR=0.0100; TPR: 0.6236 @ FPR=0.0500; TPR: 0.7743 @ FPR=0.1000
+'''
+
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face --posterior_type emp --data_path /data/zhijie/faces_emore --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 (gpu16)
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id emp-nores-blur.05 --posterior_type emp --blur_prob 0.05 (gpu28)
