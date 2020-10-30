@@ -645,6 +645,51 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
     #
     #     return X_mim
 
+    def _CW_whitebox(X, y, mean, std):
+        X_cw = X.clone()
+        y_one_hot = F.one_hot(y, num_classes=1000)
+        for _ in range(args.num_steps):
+            with torch.enable_grad():
+                outputs = attack_model(X_cw.sub(mean).div(std)).softmax(-1)
+                if outputs.dim() == 3:
+                    logits = (outputs.mean(-2) + 1e-10).log()
+                else:
+                    logits = outputs.log()
+                logit_target = torch.max(y_one_hot * logits, 1)[0]
+                logit_other = torch.max(
+                    (1 - y_one_hot) * logits - 1e6 * y_one_hot, 1)[0]
+                loss = torch.mean(logit_other - logit_target)
+                loss.backward()
+
+            X_cw += args.step_size * X_cw.grad.data.sign()
+            eta = torch.clamp(X_cw - X, -args.epsilon, args.epsilon)
+            X_cw = torch.clamp(X + eta, 0, 1.0)
+        return X_cw
+
+    def _DI_MIM_whitebox(X, y, mean, std):
+        def Resize_and_padding(x, scale_factor=1.1):
+            ori_size = x.size(-1)
+            new_size = int(x.size(-1) * scale_factor)
+            delta_w = new_size - ori_size
+            delta_h = new_size - ori_size
+            top = random.randint(0, delta_h)
+            left = random.randint(0, delta_w)
+            bottom = delta_h - top
+            right = delta_w - left
+            x = F.pad(x, pad=(left,right,top,bottom), value=0)
+            return F.interpolate(x, size = ori_size)
+
+        X_mim = X.clone()
+        g = torch.zeros_like(X_mim)
+        for _ in range(args.num_steps):
+            grad_ = _grad(Resize_and_padding(X_mim), y, mean, std)
+            grad_ /= grad_.abs().mean(dim=[1,2,3], keepdim=True)
+            g = g * args.mim_momentum + grad_
+            X_mim += args.step_size * g.sign()
+            eta = torch.clamp(X_mim - X, -args.epsilon, args.epsilon)
+            X_mim = torch.clamp(X + eta, 0, 1.0)
+        return X_mim
+
     is_transferred = True if (attack_model is not None and attack_model != model) else False
     model.eval()
     parallel_eval(model)
