@@ -87,7 +87,8 @@ def load_dataset_ft(args, INPUT_SIZE=[112, 112],
         transforms.ToTensor(),
         transforms.Normalize(mean = RGB_MEAN, std = RGB_STD)
     ])
-    train_data = dset.ImageFolder(os.path.join(args.data_path, 'CASIA-maxpy-align'), train_transform)
+    train_data = dset.ImageFolder(os.path.join(args.data_path,
+        'CASIA-maxpy-align{}'.format('-all' if args.use_all_face_data else '')), train_transform)
     weights = torch.DoubleTensor(make_weights_for_balanced_classes(train_data.imgs, len(train_data.classes)))
     if args.distributed:
         from catalyst.data.sampler import DistributedSamplerWrapper

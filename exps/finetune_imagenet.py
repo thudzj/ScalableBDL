@@ -648,6 +648,7 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
 
     def _CW_whitebox(X, y, mean, std):
         X_cw = X.clone()
+        X_cw += torch.cuda.FloatTensor(*X_cw.shape).uniform_(-args.epsilon, args.epsilon)
         y_one_hot = F.one_hot(y, num_classes=1000)
         for _ in range(args.num_steps):
             X_cw.requires_grad_()
@@ -735,7 +736,7 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
         if args.distributed: mis = dist_collect(mis)
 
     # print_log('Attack by {}, ensemble TOP1: {:.4f}, TOP5: {:.4f}, LOS: {:.4f}'.format(
-        # attack_method, top1.item(), top5.item(), losses.item()), log)
+    #     attack_method, top1.item(), top5.item(), losses.item()), log)
     if args.gpu == 0 and mis is not None:
         np.save(os.path.join(args.save_path, 'mis_{}{}.npy'.format(attack_method, "_transferred" if is_transferred else "")), mis.data.cpu().numpy())
     disable_parallel_eval(model)

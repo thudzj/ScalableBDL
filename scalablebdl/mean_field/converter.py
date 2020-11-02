@@ -4,9 +4,9 @@ import warnings
 
 import torch
 import torch.nn as nn
-from torch.nn import Linear, Conv2d, BatchNorm2d
+from torch.nn import Linear, Conv2d, BatchNorm2d, PReLU
 
-from . import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
+from . import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF, BayesPReLUMF
 
 def to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=False):
     return _to_bayesian(copy.deepcopy(input), psi_init_range, num_mc_samples, is_residual)

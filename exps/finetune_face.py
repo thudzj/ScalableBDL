@@ -21,9 +21,13 @@ from kornia import gaussian_blur2d
 from utils import AverageMeter, RecorderMeter, time_string, \
     convert_secs2time, _ECELoss, plot_mi, accuracy, \
     reduce_tensor, dist_collect, print_log, save_checkpoint, \
-    gaussian_kernel, smooth, verify
+    gaussian_kernel, smooth
+from face_verification import verify
 from dataset.face import load_dataset_ft
-import models.mobilenet as models
+import models.mobilenet as mobilenet
+import models.model_irse as model_irse
+import face_metrics
+from models.utils import load_state_dict_from_url
 
 # step 0: clone the ScalableBDL repo and checkout to the efficient branch
 sys.path.insert(0, '../')
@@ -40,6 +44,7 @@ parser.add_argument('--data_path', metavar='DPATH', type=str,
                     default='/data/xiaoyang/data/faces_emore/')
 parser.add_argument('--dataset', metavar='DSET', type=str, default='face')
 parser.add_argument('--arch', metavar='ARCH', default='mobilenet_v2')
+parser.add_argument('--head', type=str, default='Softmax')
 # parser.add_argument('--transferred_attack_arch', metavar='ARCH', default='resnet152')
 
 # Optimization
@@ -71,8 +76,9 @@ parser.add_argument('--workers', type=int, default=4,
 parser.add_argument('--manualSeed', type=int, default=0, help='manual seed')
 
 # Bayesian
-parser.add_argument('--posterior_type', type=str, default='mfg')
+parser.add_argument('--posterior_type', type=str, default='emp')
 parser.add_argument('--psi_init_range', type=float, nargs='+', default=[-6, -5])
+parser.add_argument('--alpha', type=float, default=1.)
 parser.add_argument('--num_mc_samples', type=int, default=20)
 parser.add_argument('--uncertainty_threshold', type=float, default=0.5)
 parser.add_argument('--epsilon_max_train', type=float, default=2.)
@@ -114,6 +120,33 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
+class UnifiedModel(torch.nn.Module):
+    def __init__(self, arch, net=None, backbone=None, head=None):
+        super(UnifiedModel, self).__init__()
+        self.arch = arch
+        self.net = net
+        self.backbone = backbone
+        self.head = head
+
+    def forward(self, input, target=None, return_features=False, is_logits=True):
+        if self.arch == 'mobilenet_v2':
+            return self.net(input, return_features, is_logits)
+        elif self.arch == 'IR_50':
+            x, y = self.backbone(input)
+            if is_logits:
+                if y.dim() == 3:
+                    target_ = target[:, None].repeat(1, y.shape[1]).view(-1)
+                    y = self.head(y.flatten(0, 1), target_).view(*y.shape[:2], -1)
+                else:
+                    y = self.head(y, target)
+
+            if return_features:
+                return x, y
+            else:
+                return y
+        else:
+            raise NotImplementedError
+
 best_acc = 0
 
 def main():
@@ -126,6 +159,7 @@ def main():
     # step 0: note to pre-process some hyper-paramters
     args.epsilon_max_train *= args.epsilon
     args.epsilon_min_train *= args.epsilon
+    args.use_all_face_data = (args.head == 'ArcFace')
 
     args.use_cuda = torch.cuda.is_available()
     if args.manualSeed is None: args.manualSeed = random.randint(1, 10000)
@@ -160,13 +194,44 @@ def main_worker(gpu, ngpus_per_node, args):
     log = (log, args.gpu)
 
     # step 1: convert the last res-block to be Bayesian
-    net = models.__dict__[args.arch](pretrained=True, num_classes=10341)
     # disable_dropout(net) # we may need to disable the dropout (not sure, need try)
-    if args.posterior_type == 'mfg':
-        raise NotImplementedError
-    elif args.posterior_type == 'emp':
-        net.features[-1] = to_bayesian_emp(net.features[-1], args.num_mc_samples)
-        net.features[-2] = to_bayesian_emp(net.features[-2], args.num_mc_samples)
+    if args.arch == 'mobilenet_v2':
+        net_ = mobilenet.__dict__[args.arch](pretrained=True, num_classes=10341)
+        if args.posterior_type == 'emp':
+            net_.features[-1] = to_bayesian_emp(net_.features[-1], args.num_mc_samples)
+            net_.features[-2] = to_bayesian_emp(net_.features[-2], args.num_mc_samples)
+        elif args.posterior_type == 'mfg':
+            net_.features[-1] = to_bayesian_mfg(net_.features[-1], args.psi_init_range, args.num_mc_samples)
+            net_.features[-2] = to_bayesian_mfg(net_.features[-2], args.psi_init_range, args.num_mc_samples)
+        else:
+            raise NotImplementedError
+        net = UnifiedModel(args.arch, net=net_)
+    elif args.arch == 'IR_50':
+        backbone_ = model_irse.__dict__[args.arch]([112, 112])
+        backbone_.load_state_dict(load_state_dict_from_url(
+            'http://ml.cs.tsinghua.edu.cn/~zhijie/files/Backbone_IR_50_{}.pth'.format(args.head),
+            map_location=lambda storage, loc: storage.cuda(args.gpu), progress=True))
+        if args.posterior_type == 'emp':
+            backbone_.body[-1] = to_bayesian_emp(backbone_.body[-1], args.num_mc_samples)
+            # backbone_.body[-1].shortcut_layer = to_bayesian_emp(torch.nn.Sequential(
+            #         torch.nn.Conv2d(512, 512, (1, 1), 1, bias=False),
+            #         torch.nn.BatchNorm2d(512),
+            #     ), args.num_mc_samples, is_residual=True)
+        elif args.posterior_type == 'mfg':
+            backbone_.body[-1] = to_bayesian_mfg(backbone_.body[-1], args.psi_init_range, args.num_mc_samples)
+            # backbone_.body[-1].shortcut_layer = to_bayesian_mfg(torch.nn.Sequential(
+            #         torch.nn.Conv2d(512, 512, (1, 1), 1, bias=False),
+            #         torch.nn.BatchNorm2d(512),
+            #     ), args.psi_init_range, args.num_mc_samples, is_residual=True)
+        else:
+            raise NotImplementedError
+
+        head_ = face_metrics.__dict__[args.head](in_features=512,
+            out_features=10575 if args.use_all_face_data else 10341, device_id=None)
+        head_.load_state_dict(load_state_dict_from_url(
+            'http://ml.cs.tsinghua.edu.cn/~zhijie/files/Head_{}.pth'.format(args.head),
+            map_location=lambda storage, loc: storage.cuda(args.gpu), progress=True))
+        net = UnifiedModel(args.arch, backbone=backbone_, head=head_)
     else:
         raise NotImplementedError
 
@@ -188,7 +253,6 @@ def main_worker(gpu, ngpus_per_node, args):
         net.cuda(args.gpu)
         args.batch_size = int(args.batch_size / ngpus_per_node)
         net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[args.gpu])
-
         # attack_net.cuda(args.gpu)
         # attack_net = torch.nn.parallel.DistributedDataParallel(attack_net, device_ids=[args.gpu])
     else:
@@ -273,7 +337,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train_acc, train_los = train(train_loader, net,
                                      criterion, mean, std, stack_kernel, pre_trained_optimizer, new_added_optimizer,
                                      epoch, args, log)
-        evaluate(val_loaders, net, criterion, mean, std, stack_kernel, args, log)
+        # evaluate(val_loaders, net, criterion, mean, std, stack_kernel, args, log)
         recorder.update(epoch, train_los, train_acc, 0, 0)
 
         if args.gpu == 0:
@@ -342,7 +406,8 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
             set_mc_sample_id(model, args.num_mc_samples, mc_sample_id)
 
         # step 5: forward prop for predicted logits of normal data and features of noisy data
-        features, output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]), return_features=True)
+        target_ = torch.cat([target, torch.zeros(bs1*2, device=target.device)])
+        features, output = model(torch.cat([input, input1.repeat(2, 1, 1, 1)]), target_, return_features=True)
 
         # step 6: calculate CE loss and uncertainty loss
         loss = criterion(output[:bs], target)
@@ -360,7 +425,7 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         # step 7: backward prop and perform optimization
         pre_trained_optimizer.zero_grad()
         new_added_optimizer.zero_grad()
-        (loss+ur_loss).backward()
+        (loss+ur_loss*args.alpha).backward()
         pre_trained_optimizer.step()
         new_added_optimizer.step()
 

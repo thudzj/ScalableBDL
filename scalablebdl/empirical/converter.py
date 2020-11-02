@@ -4,16 +4,16 @@ import warnings
 
 import torch
 import torch.nn as nn
-from torch.nn import Linear, Conv2d, BatchNorm2d
+from torch.nn import Linear, Conv2d, BatchNorm2d, PReLU
 
-from . import BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP
+from . import BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP, BayesPReLUEMP
 
 def to_bayesian(input, num_mc_samples=20, is_residual=False):
     return _to_bayesian(copy.deepcopy(input), num_mc_samples, is_residual)
 
 def _to_bayesian(input, num_mc_samples=20, is_residual=False):
 
-    if isinstance(input, (Linear, Conv2d, BatchNorm2d)):
+    if isinstance(input, (Linear, Conv2d, BatchNorm2d, PReLU)):
         if isinstance(input, (Linear)):
             output = BayesLinearEMP(input.in_features, input.out_features,
                                     input.bias, num_mc_samples=num_mc_samples)
@@ -23,6 +23,8 @@ def _to_bayesian(input, num_mc_samples=20, is_residual=False):
                                     input.padding, input.dilation,
                                     input.groups, input.bias,
                                     num_mc_samples=num_mc_samples)
+        elif isinstance(input, (PReLU)):
+            output = BayesPReLUEMP(input.num_parameters, num_mc_samples=num_mc_samples)
         else:
             output = BayesBatchNorm2dEMP(input.num_features, input.eps,
                                          input.momentum, input.affine,
@@ -43,7 +45,7 @@ def _to_bayesian(input, num_mc_samples=20, is_residual=False):
             else:
                 output.weights.data = input.weight.unsqueeze(0).repeat(
                     num_mc_samples, *([1,]*input.weight.dim())).data
-        if input.bias is not None:
+        if hasattr(input, 'bias') and input.bias is not None:
             if is_residual:
                 output.biases.data.zero_()
             else:

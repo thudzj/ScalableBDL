@@ -14,10 +14,10 @@ class _BayesBatchNormMF(Module):
     __constants__ = ['track_running_stats',
                      'momentum', 'eps', 'weight', 'bias',
                      'running_mean', 'running_var', 'num_batches_tracked',
-                     'num_features', 'affine']
+                     'num_features', 'affine', 'num_mc_samples']
 
     def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True,
-                 track_running_stats=True, deterministic=False, num_mc_samples=None):
+                 track_running_stats=True, deterministic=False, num_mc_samples=20):
         super(_BayesBatchNormMF, self).__init__()
         self.num_features = num_features
         self.eps = eps
@@ -150,7 +150,7 @@ class _BayesBatchNormMF(Module):
         return out
 
     def extra_repr(self):
-        return '{num_features}, ' \
+        return '{num_features}, {num_mc_samples}, ' \
                 'eps={eps}, momentum={momentum}, affine={affine}, ' \
                 'track_running_stats={track_running_stats}'.format(**self.__dict__)
 

@@ -1,24 +1,24 @@
 import numpy as np
 import torch
-from .mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF
-from .empirical import BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP
-from .implicit import BayesLinearIMP, BayesConv2dIMP, BayesBatchNorm2dIMP
+from .mean_field import BayesLinearMF, BayesConv2dMF, BayesBatchNorm2dMF, BayesPReLUMF
+from .empirical import BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP, BayesPReLUEMP
+from .implicit import BayesLinearIMP, BayesConv2dIMP, BayesBatchNorm2dIMP, BayesPReLUIMP
 
 # freeze and unfreeze work for mean-field and implicit posteriors
 def freeze(net):
     net.apply(_freeze)
 
 def _freeze(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
-            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF, BayesPReLUMF)) \
+            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP, BayesPReLUIMP)):
         m.deterministic = True
 
 def unfreeze(net):
     net.apply(_unfreeze)
 
 def _unfreeze(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
-            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF, BayesPReLUMF)) \
+            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP, BayesPReLUIMP)):
         m.deterministic = False
 
 # set_mc_sample_id only works for empirical posterior
@@ -32,7 +32,7 @@ def set_mc_sample_id(net, num_mc_samples, mc_sample_id=None, batch_size=None):
         else:
             assert isinstance(mc_sample_id, np.ndarray)
     for m in net.modules():
-        if isinstance(m, (BayesConv2dEMP, BayesLinearEMP, BayesBatchNorm2dEMP)):
+        if isinstance(m, (BayesConv2dEMP, BayesLinearEMP, BayesBatchNorm2dEMP, BayesPReLUEMP)):
             m.mc_sample_id = mc_sample_id
 
 def disable_dropout(net):
@@ -44,18 +44,18 @@ def parallel_eval(net):
     net.apply(_parallel_eval)
 
 def _parallel_eval(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
-            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)) \
-            or isinstance(m, (BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF, BayesPReLUMF)) \
+            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP, BayesPReLUIMP)) \
+            or isinstance(m, (BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP, BayesPReLUEMP)):
         m.parallel_eval = True
 
 def disable_parallel_eval(net):
     net.apply(_disable_parallel_eval)
 
 def _disable_parallel_eval(m):
-    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF)) \
-            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP)) \
-            or isinstance(m, (BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP)):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF, BayesBatchNorm2dMF, BayesPReLUMF)) \
+            or isinstance(m, (BayesConv2dIMP, BayesLinearIMP, BayesBatchNorm2dIMP, BayesPReLUIMP)) \
+            or isinstance(m, (BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP, BayesPReLUEMP)):
         m.parallel_eval = False
 
 def Bayes_ensemble(loader, model, loss_metric=torch.nn.functional.cross_entropy,

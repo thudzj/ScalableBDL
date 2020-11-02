@@ -121,3 +121,175 @@ NAT vs. PGD_L2 --> AP: 0.9881; TPR: 0.8334 @ FPR=0.0100; TPR: 0.9699 @ FPR=0.050
 NAT vs. PGD_transferred from resnet152 --> AP: 0.9991; TPR: 0.9924 @ FPR=0.0100; TPR: 0.9976 @ FPR=0.0500; TPR: 0.9986 @ FPR=0.1000
 NAT vs. MIM_transferred from resnet152 --> AP: 0.9992; TPR: 0.9886 @ FPR=0.0100; TPR: 0.9977 @ FPR=0.0500; TPR: 0.9988 @ FPR=0.1000
 NAT vs. TIM_transferred from resnet152 --> AP: 0.9936; TPR: 0.9112 @ FPR=0.0100; TPR: 0.9781 @ FPR=0.0500; TPR: 0.9886 @ FPR=0.1000
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id emp-nores-blur.05-6epoch --posterior_type emp --blur_prob 0.05 --epochs 6 (gpu28)
+Parallel ensemble 20 TOP1: 76.2180, TOP5: 92.9320, LOS: 0.9767, ECE: 0.0478
+NAT vs. FGSM --> AP: 1.0000; TPR: 0.9996 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
+NAT vs. CW --> AP: 0.9662; TPR: 0.5595 @ FPR=0.0100; TPR: 0.8629 @ FPR=0.0500; TPR: 0.9341 @ FPR=0.1000
+NAT vs. BIM --> AP: 0.9849; TPR: 0.7902 @ FPR=0.0100; TPR: 0.9405 @ FPR=0.0500; TPR: 0.9705 @ FPR=0.1000
+NAT vs. PGD --> AP: 0.9905; TPR: 0.8686 @ FPR=0.0100; TPR: 0.9712 @ FPR=0.0500; TPR: 0.9866 @ FPR=0.1000
+NAT vs. MIM --> AP: 0.9951; TPR: 0.9303 @ FPR=0.0100; TPR: 0.9908 @ FPR=0.0500; TPR: 0.9972 @ FPR=0.1000
+NAT vs. TIM --> AP: 0.9951; TPR: 0.9282 @ FPR=0.0100; TPR: 0.9895 @ FPR=0.0500; TPR: 0.9967 @ FPR=0.1000
+NAT vs. DI_MIM --> AP: 0.9999; TPR: 0.9995 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+NAT vs. FGSM_L2 --> AP: 0.9962; TPR: 0.9516 @ FPR=0.0100; TPR: 0.9852 @ FPR=0.0500; TPR: 0.9917 @ FPR=0.1000
+NAT vs. BIM_L2 --> AP: 0.9847; TPR: 0.7928 @ FPR=0.0100; TPR: 0.9432 @ FPR=0.0500; TPR: 0.9716 @ FPR=0.1000
+NAT vs. PGD_L2 --> AP: 0.9909; TPR: 0.8768 @ FPR=0.0100; TPR: 0.9732 @ FPR=0.0500; TPR: 0.9880 @ FPR=0.1000
+NAT vs. PGD_transferred from resnet152 --> AP: 0.9992; TPR: 0.9921 @ FPR=0.0100; TPR: 0.9977 @ FPR=0.0500; TPR: 0.9986 @ FPR=0.1000
+NAT vs. CW_transferred from resnet152 --> AP: 0.9991; TPR: 0.9901 @ FPR=0.0100; TPR: 0.9970 @ FPR=0.0500; TPR: 0.9983 @ FPR=0.1000
+NAT vs. MIM_transferred from resnet152 --> AP: 0.9994; TPR: 0.9917 @ FPR=0.0100; TPR: 0.9979 @ FPR=0.0500; TPR: 0.9989 @ FPR=0.1000
+NAT vs. TIM_transferred from resnet152 --> AP: 0.9964; TPR: 0.9528 @ FPR=0.0100; TPR: 0.9851 @ FPR=0.0500; TPR: 0.9915 @ FPR=0.1000
+NAT vs. DI_MIM_transferred from resnet152 --> AP: 0.9999; TPR: 0.9994 @ FPR=0.0100; TPR: 0.9998 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id emp-nores-blur.05-6epoch-mineps.5 --posterior_type emp --blur_prob 0.05 --epochs 6 --epsilon_min_train 0.5 (gpu28)
+Parallel ensemble 20 TOP1: 76.2840, TOP5: 92.9600, LOS: 0.9755, ECE: 0.0478
+NAT vs. FGSM --> AP: 0.9994; TPR: 0.9989 @ FPR=0.0100; TPR: 0.9996 @ FPR=0.0500; TPR: 0.9998 @ FPR=0.1000
+uNAT vs. CW --> AP: 0.9664; TPR: 0.5613 @ FPR=0.0100; TPR: 0.8711 @ FPR=0.0500; TPR: 0.9412 @ FPR=0.1000
+NAT vs. BIM --> AP: 0.9801; TPR: 0.7088 @ FPR=0.0100; TPR: 0.9303 @ FPR=0.0500; TPR: 0.9682 @ FPR=0.1000
+NAT vs. PGD --> AP: 0.9869; TPR: 0.8174 @ FPR=0.0100; TPR: 0.9659 @ FPR=0.0500; TPR: 0.9843 @ FPR=0.1000
+NAT vs. MIM --> AP: 0.9922; TPR: 0.8763 @ FPR=0.0100; TPR: 0.9864 @ FPR=0.0500; TPR: 0.9953 @ FPR=0.1000
+NAT vs. TIM --> AP: 0.9924; TPR: 0.8808 @ FPR=0.0100; TPR: 0.9854 @ FPR=0.0500; TPR: 0.9953 @ FPR=0.1000
+NAT vs. DI_MIM --> AP: 0.9987; TPR: 0.9992 @ FPR=0.0100; TPR: 0.9997 @ FPR=0.0500; TPR: 0.9998 @ FPR=0.1000
+NAT vs. FGSM_L2 --> AP: 0.9914; TPR: 0.8929 @ FPR=0.0100; TPR: 0.9696 @ FPR=0.0500; TPR: 0.9836 @ FPR=0.1000
+NAT vs. BIM_L2 --> AP: 0.9797; TPR: 0.7110 @ FPR=0.0100; TPR: 0.9301 @ FPR=0.0500; TPR: 0.9669 @ FPR=0.1000
+NAT vs. PGD_L2 --> AP: 0.9869; TPR: 0.8212 @ FPR=0.0100; TPR: 0.9681 @ FPR=0.0500; TPR: 0.9858 @ FPR=0.1000
+NAT vs. CW_transferred from resnet152 --> AP: 0.9989; TPR: 0.9958 @ FPR=0.0100; TPR: 0.9984 @ FPR=0.0500; TPR: 0.9990 @ FPR=0.1000
+NAT vs. PGD_transferred from resnet152 --> AP: 0.9990; TPR: 0.9963 @ FPR=0.0100; TPR: 0.9985 @ FPR=0.0500; TPR: 0.9991 @ FPR=0.1000
+NAT vs. MIM_transferred from resnet152 --> AP: 0.9992; TPR: 0.9931 @ FPR=0.0100; TPR: 0.9982 @ FPR=0.0500; TPR: 0.9989 @ FPR=0.1000
+NAT vs. TIM_transferred from resnet152 --> AP: 0.9928; TPR: 0.9017 @ FPR=0.0100; TPR: 0.9736 @ FPR=0.0500; TPR: 0.9864 @ FPR=0.1000
+NAT vs. DI_MIM_transferred from resnet152 --> AP: 0.9990; TPR: 0.9990 @ FPR=0.0100; TPR: 0.9996 @ FPR=0.0500; TPR: 0.9997 @ FPR=0.1000
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id emp-nores-blur.02-6epoch-mineps.5 --posterior_type emp --blur_prob 0.02 --epochs 6 --epsilon_min_train 0.5 (gpu28)
+Parallel ensemble 20 TOP1: 76.1580, TOP5: 92.9620, LOS: 0.9784, ECE: 0.0470
+NAT vs. FGSM --> AP: 0.9998; TPR: 0.9995 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+NAT vs. CW --> AP: 0.9717; TPR: 0.6222 @ FPR=0.0100; TPR: 0.9093 @ FPR=0.0500; TPR: 0.9591 @ FPR=0.1000
+NAT vs. BIM --> AP: 0.9822; TPR: 0.7584 @ FPR=0.0100; TPR: 0.9386 @ FPR=0.0500; TPR: 0.9698 @ FPR=0.1000
+NAT vs. PGD --> AP: 0.9920; TPR: 0.9049 @ FPR=0.0100; TPR: 0.9833 @ FPR=0.0500; TPR: 0.9927 @ FPR=0.1000
+NAT vs. MIM --> AP: 0.9942; TPR: 0.9279 @ FPR=0.0100; TPR: 0.9929 @ FPR=0.0500; TPR: 0.9980 @ FPR=0.1000
+NAT vs. TIM --> AP: 0.9911; TPR: 0.8713 @ FPR=0.0100; TPR: 0.9828 @ FPR=0.0500; TPR: 0.9939 @ FPR=0.1000
+NAT vs. DI_MIM --> AP: 0.9996; TPR: 0.9995 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+NAT vs. FGSM_L2 --> AP: 0.9913; TPR: 0.8854 @ FPR=0.0100; TPR: 0.9713 @ FPR=0.0500; TPR: 0.9864 @ FPR=0.1000
+NAT vs. BIM_L2 --> AP: 0.9815; TPR: 0.7523 @ FPR=0.0100; TPR: 0.9375 @ FPR=0.0500; TPR: 0.9690 @ FPR=0.1000
+NAT vs. PGD_L2 --> AP: 0.9912; TPR: 0.8945 @ FPR=0.0100; TPR: 0.9809 @ FPR=0.0500; TPR: 0.9915 @ FPR=0.1000
+NAT vs. CW_transferred from resnet152 --> AP: 0.9995; TPR: 0.9970 @ FPR=0.0100; TPR: 0.9989 @ FPR=0.0500; TPR: 0.9994 @ FPR=0.1000
+NAT vs. PGD_transferred from resnet152 --> AP: 0.9996; TPR: 0.9972 @ FPR=0.0100; TPR: 0.9992 @ FPR=0.0500; TPR: 0.9995 @ FPR=0.1000
+NAT vs. MIM_transferred from resnet152 --> AP: 0.9993; TPR: 0.9932 @ FPR=0.0100; TPR: 0.9988 @ FPR=0.0500; TPR: 0.9993 @ FPR=0.1000
+NAT vs. TIM_transferred from resnet152 --> AP: 0.9660; TPR: 0.5664 @ FPR=0.0100; TPR: 0.8533 @ FPR=0.0500; TPR: 0.9240 @ FPR=0.1000
+NAT vs. DI_MIM_transferred from resnet152 --> AP: 0.9997; TPR: 0.9994 @ FPR=0.0100; TPR: 0.9998 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id emp-nores-blur.03-6epoch-mineps.5 --posterior_type emp --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 (gpu35)
+Parallel ensemble 20 TOP1: 76.3040, TOP5: 93.0040, LOS: 0.9766, ECE: 0.0501
+NAT vs. FGSM --> AP: 0.9998; TPR: 0.9994 @ FPR=0.0100; TPR: 0.9998 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+NAT vs. CW --> AP: 0.9779; TPR: 0.6844 @ FPR=0.0100; TPR: 0.9286 @ FPR=0.0500; TPR: 0.9685 @ FPR=0.1000               
+NAT vs. BIM --> AP: 0.9792; TPR: 0.7112 @ FPR=0.0100; TPR: 0.9203 @ FPR=0.0500; TPR: 0.9610 @ FPR=0.1000
+NAT vs. PGD --> AP: 0.9903; TPR: 0.8678 @ FPR=0.0100; TPR: 0.9763 @ FPR=0.0500; TPR: 0.9900 @ FPR=0.1000
+NAT vs. MIM --> AP: 0.9932; TPR: 0.9036 @ FPR=0.0100; TPR: 0.9871 @ FPR=0.0500; TPR: 0.9958 @ FPR=0.1000
+NAT vs. TIM --> AP: 0.9908; TPR: 0.8547 @ FPR=0.0100; TPR: 0.9786 @ FPR=0.0500; TPR: 0.9932 @ FPR=0.1000
+NAT vs. DI_MIM --> AP: 0.9996; TPR: 0.9996 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000
+NAT vs. FGSM_L2 --> AP: 0.9924; TPR: 0.8998 @ FPR=0.0100; TPR: 0.9758 @ FPR=0.0500; TPR: 0.9879 @ FPR=0.1000
+NAT vs. BIM_L2 --> AP: 0.9784; TPR: 0.7058 @ FPR=0.0100; TPR: 0.9187 @ FPR=0.0500; TPR: 0.9595 @ FPR=0.1000
+NAT vs. PGD_L2 --> AP: 0.9893; TPR: 0.8559 @ FPR=0.0100; TPR: 0.9726 @ FPR=0.0500; TPR: 0.9881 @ FPR=0.1000
+NAT vs. CW_transferred from resnet152 --> AP: 0.9995; TPR: 0.9973 @ FPR=0.0100; TPR: 0.9992 @ FPR=0.0500; TPR: 0.9995 @ FPR=0.1000
+NAT vs. PGD_transferred from resnet152 --> AP: 0.9996; TPR: 0.9975 @ FPR=0.0100; TPR: 0.9992 @ FPR=0.0500; TPR: 0.9996 @ FPR=0.1000
+NAT vs. MIM_transferred from resnet152 --> AP: 0.9994; TPR: 0.9937 @ FPR=0.0100; TPR: 0.9988 @ FPR=0.0500; TPR: 0.9995 @ FPR=0.1000
+NAT vs. TIM_transferred from resnet152 --> AP: 0.9808; TPR: 0.7239 @ FPR=0.0100; TPR: 0.9223 @ FPR=0.0500; TPR: 0.9626 @ FPR=0.1000
+NAT vs. DI_MIM_transferred from resnet152 --> AP: 0.9997; TPR: 0.9994 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
+
+-----------face------------
+origin softmax
+Parallel ensemble 20 vgg2_fp: 0.9256
+Parallel ensemble 20 lfw: 0.9913
+Parallel ensemble 20 agedb_30: 0.9177
+Parallel ensemble 20 lfw: 0.9913
+Parallel ensemble 20 calfw: 0.9107
+Parallel ensemble 20 cplfw: 0.8630
+Parallel ensemble 20 cfp_ff: 0.9873
+Parallel ensemble 20 cfp_fp: 0.9523
+
+#########
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_softmax-alpha100 --posterior_type emp --data_path /data/zhijie/faces_emore --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 --arch IR_50 --head Softmax --alpha 100  (gpu16 or gpu35)
+Parallel ensemble 20 vgg2_fp: 0.9246
+Parallel ensemble 20 lfw: 0.9892
+Parallel ensemble 20 lfw: 0.9892
+Parallel ensemble 20 cplfw: 0.8598
+Parallel ensemble 20 calfw: 0.9120
+Parallel ensemble 20 agedb_30: 0.9167
+Parallel ensemble 20 cfp_fp: 0.9489
+Parallel ensemble 20 cfp_ff: 0.9874
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_softmax-alpha30 --posterior_type emp --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 --arch IR_50 --head Softmax --alpha 30 (gpu35)
+Parallel ensemble 20 vgg2_fp: 0.9236
+Parallel ensemble 20 agedb_30: 0.9138
+Parallel ensemble 20 lfw: 0.9903
+Parallel ensemble 20 calfw: 0.9135
+Parallel ensemble 20 cplfw: 0.8627
+Parallel ensemble 20 lfw: 0.9903
+Parallel ensemble 20 cfp_ff: 0.9864
+Parallel ensemble 20 cfp_fp: 0.9479
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_softmax-alpha100-6epochs --posterior_type emp --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 --arch IR_50 --head Softmax --alpha 100 --epochs 6 (gpu35)
+Parallel ensemble 20 vgg2_fp: 0.9260
+Parallel ensemble 20 agedb_30: 0.9138
+Parallel ensemble 20 lfw: 0.9898
+Parallel ensemble 20 lfw: 0.9898
+Parallel ensemble 20 calfw: 0.9132
+Parallel ensemble 20 cplfw: 0.8607
+Parallel ensemble 20 cfp_fp: 0.9483
+Parallel ensemble 20 cfp_ff: 0.9867
+
+
+origin cosface
+Parallel ensemble 20 vgg2_fp: 0.9370
+Parallel ensemble 20 cplfw: 0.8915
+Parallel ensemble 20 lfw: 0.9930
+Parallel ensemble 20 calfw: 0.9327
+Parallel ensemble 20 lfw: 0.9930
+Parallel ensemble 20 agedb_30: 0.9435
+Parallel ensemble 20 cfp_fp: 0.9564
+Parallel ensemble 20 cfp_ff: 0.9927
+
+#########
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_cos-alpha100 --posterior_type emp --data_path /data/zhijie/faces_emore --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 --arch IR_50 --head CosFace --alpha 100 (gpu16)
+Parallel ensemble 20 vgg2_fp: 0.9376
+Parallel ensemble 20 lfw: 0.9935
+Parallel ensemble 20 lfw: 0.9935
+Parallel ensemble 20 calfw: 0.9352
+Parallel ensemble 20 cplfw: 0.8910
+Parallel ensemble 20 agedb_30: 0.9433
+Parallel ensemble 20 cfp_ff: 0.9927
+Parallel ensemble 20 cfp_fp: 0.9597
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_cos-alpha100-6epoch --posterior_type emp --data_path /data/zhijie/faces_emore --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 --arch IR_50 --head CosFace --alpha 100 --epochs 6 (gpu16)
+Parallel ensemble 20 vgg2_fp: 0.9366
+Parallel ensemble 20 cplfw: 0.8927
+Parallel ensemble 20 lfw: 0.9930
+Parallel ensemble 20 lfw: 0.9930
+Parallel ensemble 20 calfw: 0.9357
+Parallel ensemble 20 agedb_30: 0.9427
+Parallel ensemble 20 cfp_fp: 0.9603
+Parallel ensemble 20 cfp_ff: 0.9914
+
+
+arcface origin
+Parallel ensemble 20 vgg2_fp: 0.9356
+Parallel ensemble 20 lfw: 0.9933
+Parallel ensemble 20 cplfw: 0.8808
+Parallel ensemble 20 lfw: 0.9933
+Parallel ensemble 20 calfw: 0.9292
+Parallel ensemble 20 agedb_30: 0.9327
+Parallel ensemble 20 cfp_ff: 0.9914
+Parallel ensemble 20 cfp_fp: 0.9587
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_arc-alpha100 --posterior_type emp --data_path /data/zhijie/faces_emore --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 1 --arch IR_50 --head ArcFace --alpha 100 (gpu16)
+Parallel ensemble 20 vgg2_fp: 0.9348
+Parallel ensemble 20 lfw: 0.9943
+Parallel ensemble 20 cplfw: 0.8837
+Parallel ensemble 20 agedb_30: 0.9337
+Parallel ensemble 20 lfw: 0.9943
+Parallel ensemble 20 calfw: 0.9283
+Parallel ensemble 20 cfp_fp: 0.9573
+Parallel ensemble 20 cfp_ff: 0.9921
