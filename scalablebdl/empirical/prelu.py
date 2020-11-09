@@ -67,6 +67,8 @@ class BayesPReLUEMP(Module):
 
     def forward(self, input: Tensor) -> Tensor:
         if self.parallel_eval:
+            if input.dim() == 4:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
             return torch.maximum(input, torch.tensor(0., device=input.device)) + self.weights[None, :, :, None, None] * torch.minimum(input, torch.tensor(0., device=input.device))
         elif isinstance(self.mc_sample_id, int):
             self.mc_sample_id = self.mc_sample_id % self.num_mc_samples

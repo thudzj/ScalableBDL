@@ -262,6 +262,9 @@ def plot_mi(dir_, type_, type2_=None):
     else:
         label_ = type_.capitalize()
 
+    mi_nat = mi_nat[~np.isnan(mi_nat)]
+    mi_svhn = mi_svhn[~np.isnan(mi_svhn)]
+
     # Draw the density plot
     sns.distplot(mi_nat, hist = False, kde = True,
                  kde_kws = {'shade': True, 'linewidth': 1, 'clip': (-0.0001, 3)},
@@ -274,7 +277,7 @@ def plot_mi(dir_, type_, type2_=None):
     y = np.zeros(x.shape[0])
     y[mi_nat.shape[0]:] = 1
 
-    ap = metrics.average_precision_score(y, x)
+    ap = metrics.roc_auc_score(y, x)
     fpr, tpr, thresholds = metrics.roc_curve(y, x)
     accs = {th: tpr[np.argwhere(fpr <= th).max()] for th in [0.01, 0.05, 0.1]}
 
@@ -285,7 +288,7 @@ def plot_mi(dir_, type_, type2_=None):
     plt.tight_layout()
     plt.savefig(os.path.join(dir_, '{}_vs_{}.pdf'.format('nat'
         if type2_ is None else type2_, type_)), bbox_inches='tight')
-    return "AP: {:.4f}; ".format(ap) + "; ".join(["TPR: {:.4f} @ FPR={:.4f}".format(v, k) for k, v in accs.items()])
+    return "auroc: {:.4f}; ".format(ap) + "; ".join(["TPR: {:.4f} @ FPR={:.4f}".format(v, k) for k, v in accs.items()]) + "  {}-{}".format(len(mi_nat), len(mi_svhn))
 
 def plot_ens(dir_, rets, baseline_acc=None):
     lw = 1.25
