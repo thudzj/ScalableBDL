@@ -382,7 +382,8 @@ def train(train_loader, model, criterion, mean, std, stack_kernel,
         # step 4: set mc_sample_id if using empirical distribution (population based)
         if args.posterior_type == 'emp':
             if args.batchwise_sample: #for not using uncertainty reg. only
-                mc_sample_id = np.random.randint(0, args.num_mc_samples)
+                tmp = np.random.choice(args.num_mc_samples, 2, replace=False)
+                mc_sample_id = np.concatenate([np.random.randint(0, args.num_mc_samples) * np.ones(bs), tmp[0] * np.ones(bs1), tmp[1] * np.ones(bs1)])
             else:
                 mc_sample_id = np.concatenate([np.random.randint(0, args.num_mc_samples, size=bs),
                     np.stack([np.random.choice(args.num_mc_samples, 2, replace=False) for _ in range(bs1)]).T.reshape(-1)])
