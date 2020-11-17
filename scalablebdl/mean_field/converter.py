@@ -13,7 +13,7 @@ def to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=F
 
 def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=False):
 
-    if isinstance(input, (Linear, Conv2d, BatchNorm2d)):
+    if isinstance(input, (Linear, Conv2d, BatchNorm2d, PReLU)):
         if isinstance(input, (Linear)):
             output = BayesLinearMF(input.in_features, input.out_features,
                                    input.bias, num_mc_samples=num_mc_samples)
@@ -23,6 +23,8 @@ def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=
                                    input.padding, input.dilation,
                                    input.groups, input.bias,
                                    num_mc_samples=num_mc_samples)
+        elif isinstance(input, (PReLU)):
+            output = BayesPReLUMF(input.num_parameters, num_mc_samples=num_mc_samples)
         else:
             output = BayesBatchNorm2dMF(input.num_features, input.eps,
                                         input.momentum, input.affine,
@@ -33,7 +35,8 @@ def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=
             setattr(output, 'num_batches_tracked', getattr(input, 'num_batches_tracked'))
 
         setattr(output, 'weight_mu', getattr(input, 'weight'))
-        setattr(output, 'bias_mu', getattr(input, 'bias'))
+        if hasattr(input, 'bias'):
+            setattr(output, 'bias_mu', getattr(input, 'bias'))
         if is_residual:
             if isinstance(input, (Conv2d)):
                 output.weight_mu.data = torch.eye(output.weight_mu.data.size(0)).unsqueeze(2).unsqueeze(3).float()
@@ -47,7 +50,7 @@ def _to_bayesian(input, psi_init_range=[-6, -5], num_mc_samples=20, is_residual=
         if output.weight_psi is not None:
             output.weight_psi.data.uniform_(psi_init_range[0], psi_init_range[1])
             output.weight_psi.data = output.weight_psi.data.to(output.weight_mu.device)
-        if output.bias_psi is not None:
+        if hasattr(output, 'bias_psi') and output.bias_psi is not None:
             output.bias_psi.data.uniform_(psi_init_range[0], psi_init_range[1])
             output.bias_psi.data = output.bias_psi.data.to(output.bias_mu.device)
 

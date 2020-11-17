@@ -497,7 +497,7 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
         losses = reduce_tensor(losses.data, args)
         top1 = reduce_tensor(top1.data, args)
         top5 = reduce_tensor(top5.data, args)
-
+        torch.distributed.barrier()
         mis = torch.cat(mis, 0)
         if args.distributed: mis = dist_collect(mis)
 

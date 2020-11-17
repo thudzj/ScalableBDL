@@ -73,6 +73,8 @@ class BayesPReLUMF(Module):
             weight = torch.randn(input.size(0), self.num_parameters, device=input.device, dtype=input.dtype) * self.weight_psi.exp() + self.weight_mu
             return torch.maximum(input, torch.tensor(0., device=input.device)) + weight[:, :, None, None] * torch.minimum(input, torch.tensor(0., device=input.device))
         else:
+            if input.dim() == 4:
+                input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
             weight = torch.randn(self.num_mc_samples, self.num_parameters, device=input.device, dtype=input.dtype) * self.weight_psi.exp() + self.weight_mu
             return torch.maximum(input, torch.tensor(0., device=input.device)) + weight[None, :, :, None, None] * torch.minimum(input, torch.tensor(0., device=input.device))
         

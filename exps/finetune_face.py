@@ -86,6 +86,7 @@ parser.add_argument('--epsilon_min_train', type=float, default=1.)
 parser.add_argument('--blur_prob', type=float, default=0.1)
 parser.add_argument('--blur_kernel_size', type=int, nargs='+', default=[3, 5, 7, 9, 11])
 parser.add_argument('--blur_sig', type=float, nargs='+', default=[0., 5.])
+parser.add_argument('--mc_dropout', action='store_true', default=False)
 
 # Attack settings
 parser.add_argument('--attack_methods', type=str, nargs='+',
@@ -211,7 +212,9 @@ def main_worker(gpu, ngpus_per_node, args):
         backbone_.load_state_dict(load_state_dict_from_url(
             'http://ml.cs.tsinghua.edu.cn/~zhijie/files/Backbone_IR_50_{}.pth'.format(args.head),
             map_location=lambda storage, loc: storage.cuda(args.gpu), progress=True))
-        if args.posterior_type == 'emp':
+        if args.mc_dropout:
+            pass
+        elif args.posterior_type == 'emp':
             backbone_.body[-1] = to_bayesian_emp(backbone_.body[-1], args.num_mc_samples)
             # backbone_.body[-1].shortcut_layer = to_bayesian_emp(torch.nn.Sequential(
             #         torch.nn.Conv2d(512, 512, (1, 1), 1, bias=False),
@@ -270,13 +273,13 @@ def main_worker(gpu, ngpus_per_node, args):
             pre_trained.append(param)
     pre_trained_optimizer = SGD(pre_trained, args.ft_lr, args.momentum,
                                 weight_decay=args.decay)
-
-    if args.posterior_type == 'mfg':
-        new_added_optimizer = PsiSGD(new_added, args.lr, args.momentum,
-                                     weight_decay=args.decay)
-    else:
-        new_added_optimizer = SGD(new_added, args.lr, args.momentum,
-                                  weight_decay=args.decay/args.num_mc_samples)
+    if not args.mc_dropout:
+        if args.posterior_type == 'mfg':
+            new_added_optimizer = PsiSGD(new_added, args.lr, args.momentum,
+                                         weight_decay=args.decay)
+        else:
+            new_added_optimizer = SGD(new_added, args.lr, args.momentum,
+                                      weight_decay=args.decay/args.num_mc_samples)
 
     recorder = RecorderMeter(args.epochs)
     if args.resume:
@@ -310,12 +313,12 @@ def main_worker(gpu, ngpus_per_node, args):
     stack_kernel = gaussian_kernel().cuda(args.gpu)
 
     # step 2: set the num_data arg for new_added_optimizer if using mean-field Gaussian
-    if args.posterior_type == 'mfg':
-        new_added_optimizer.num_data = len(train_loader.dataset)
+    if not args.mc_dropout:
+        if args.posterior_type == 'mfg':
+            new_added_optimizer.num_data = len(train_loader.dataset)
 
-    if args.evaluate:
-        while True:
-            evaluate(val_loaders, net,
+    if args.evaluate or args.mc_dropout:
+        evaluate(val_loaders, net,
                      criterion, mean, std, stack_kernel, args, log)
         return
 
@@ -353,8 +356,7 @@ def main_worker(gpu, ngpus_per_node, args):
         start_time = time.time()
         recorder.plot_curve(os.path.join(args.save_path, 'log.png'))
 
-    while True:
-        evaluate(val_loaders, net,
+    evaluate(val_loaders, net,
                  criterion, mean, std, stack_kernel, args, log)
 
     log[0].close()
@@ -469,6 +471,9 @@ def evaluate(val_loaders, net,
 
 def ens_validate(val_loaders, model, criterion, args, log):
     model.eval()
+    if args.mc_dropout:
+        for m in model.modules():
+            if m.__class__.__name__.startswith('Dropout'): m.train()
     # evaluation/adv attack step 1: enable parallel_eval
     parallel_eval(model)
 
@@ -488,14 +493,22 @@ def ens_validate(val_loaders, model, criterion, args, log):
 
                 # evaluation/adv attack step 2: obtain features for estimating uncertainty (mi);
                 # obtain output, which is in the shape [batch_size, num_mc_samples, num_features] and need to be transformed via outputs.mean(-2) to get predicted embedding
-                features, outputs = model(input, return_features=True, is_logits=False)
+                if args.mc_dropout:
+                    outputs = []
+                    for _ in range(args.num_mc_samples):
+                        output = model(input, is_logits=False)
+                        outputs.append(output)
+                    outputs = torch.stack(outputs, 1)
+                    features = outputs
+                else:
+                    features, outputs = model(input, return_features=True, is_logits=False)
                 assert outputs.dim() == 3
 
                 embedding = outputs.mean(-2)
                 norm = torch.norm(embedding, 2, 1, True)
                 embeddings.append(torch.div(embedding, norm))
 
-                mi = features.var(dim=1).mean(dim=[1,2,3])
+                mi = features.var(dim=1).mean(dim=[1,2,3] if not args.mc_dropout else [1])
                 mis.append(mi)
 
     embeddings = torch.cat(embeddings).data.cpu().numpy()
@@ -518,7 +531,13 @@ def ens_attack(val_loaders, model, criterion, mean, std, stack_kernel, args, log
         with attack_model.no_sync():
             with torch.enable_grad():
                 X.requires_grad_()
+                if args.mc_dropout:
+                    for m in attack_model.modules():
+                        if m.__class__.__name__.startswith('Dropout'): m.eval()
                 outputs = attack_model(X.sub(mean).div(std), is_logits=False)
+                if args.mc_dropout:
+                    for m in attack_model.modules():
+                        if m.__class__.__name__.startswith('Dropout'): m.train()
                 if outputs.dim() == 3:
                     output = outputs.mean(-2).reshape(X.size(0)//2, 2, outputs.size(-1))
                 else:
@@ -679,10 +698,12 @@ def ens_attack(val_loaders, model, criterion, mean, std, stack_kernel, args, log
 
     is_transferred = True if (attack_model is not None and attack_model != model) else False
     model.eval()
+    if args.mc_dropout:
+        for m in model.modules():
+            if m.__class__.__name__.startswith('Dropout'): m.train()
     parallel_eval(model)
     if is_transferred:
-        attack_model.eval()
-        parallel_eval(attack_model)
+        assert False
     else:
         attack_model = model
 
@@ -703,19 +724,34 @@ def ens_attack(val_loaders, model, criterion, mean, std, stack_kernel, args, log
                 mask = torch.from_numpy(is_pair).cuda(args.gpu, non_blocking=True) == True
                 input = input[mask, :, :, :, :].view(-1, 3, 112, 112)
 
+                if args.mc_dropout:
+                    for m in model.modules():
+                        if m.__class__.__name__.startswith('Dropout'): m.eval()
                 target = model(input.sub(mean).div(std), is_logits=False)
+                if args.mc_dropout:
+                    for m in model.modules():
+                        if m.__class__.__name__.startswith('Dropout'): m.train()
                 if target.dim() == 3:
                     target = target.mean(-2).reshape(input.size(0)//2, 2, -1)
                 else:
                     target = target.reshape(input.size(0)//2, 2, -1)
                 X_adv = eval('_{}_whitebox'.format(attack_method))(input, target, mean, std)
-                features, outputs = model(X_adv.sub(mean).div(std), return_features=True, is_logits=False)
+
+                if args.mc_dropout:
+                    outputs = []
+                    for _ in range(args.num_mc_samples):
+                        output = model(X_adv.sub(mean).div(std), is_logits=False)
+                        outputs.append(output)
+                    outputs = torch.stack(outputs, 1)
+                    features = outputs
+                else:
+                    features, outputs = model(X_adv.sub(mean).div(std), return_features=True, is_logits=False)
 
                 # embedding = outputs.mean(-2)
                 # norm = torch.norm(embedding, 2, 1, True)
                 # embeddings.append(torch.div(embedding, norm))
 
-                mi = features.var(dim=1).mean(dim=[1,2,3])
+                mi = features.var(dim=1).mean(dim=[1,2,3] if not args.mc_dropout else [1])
                 mis.append(mi)
 
     mis = torch.cat(mis, 0)
@@ -724,7 +760,6 @@ def ens_attack(val_loaders, model, criterion, mean, std, stack_kernel, args, log
         np.save(os.path.join(args.save_path, 'mis_{}_{}{}.npy'.format(attack_method, name, "_transferred" if is_transferred else "")), mis.data.cpu().numpy())
 
     disable_parallel_eval(model)
-    if is_transferred: disable_parallel_eval(attack_model)
     torch.distributed.barrier()
 
 

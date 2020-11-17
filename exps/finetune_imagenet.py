@@ -63,6 +63,7 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                     help='Evaluate model on test set')
+parser.add_argument('--inference_speed_profile', type=str, default=None)
 
 # Acceleration
 parser.add_argument('--workers', type=int, default=4,
@@ -99,6 +100,7 @@ parser.add_argument('--step-size', default=1./255., type=float,
                     help='perturb step size')
 parser.add_argument('--random', default=True,
                     help='random initialization for PGD')
+parser.add_argument('--mimicry', default=0., type=float)
 
 # Dist
 parser.add_argument('--world-size', default=1, type=int,
@@ -159,6 +161,55 @@ def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
     assert args.gpu is not None
     print("Use GPU: {} for training".format(args.gpu))
+
+    if args.inference_speed_profile != None:
+        net = models.__dict__[args.arch](pretrained=True)
+        if args.inference_speed_profile == 'libre':
+            net.layer4[-1] = to_bayesian_emp(net.layer4[-1], args.num_mc_samples)
+        elif args.inference_speed_profile == 'LMFVI':
+            net.layer4[-1] = to_bayesian_mfg(net.layer4[-1], args.psi_init_range, args.num_mc_samples)
+        elif args.inference_speed_profile == 'MFVI':
+            net = to_bayesian_mfg(net, args.psi_init_range, args.num_mc_samples)
+        elif args.inference_speed_profile == 'MC_dropout':
+            from models.resnet import Bottleneck
+            for module in net.modules():
+                if isinstance(module, Bottleneck):
+                    setattr(module, 'conv2', torch.nn.Sequential(module.conv2, torch.nn.Dropout(p=0.2)))
+                    setattr(module, 'conv3', torch.nn.Sequential(module.conv3, torch.nn.Dropout(p=0.2)))
+        elif args.inference_speed_profile == 'DNN':
+            pass
+        else:
+            raise NotImplementedError
+        net.cuda(args.gpu)
+        net.eval()
+        if args.inference_speed_profile == 'LMFVI' or args.inference_speed_profile == 'libre':
+            parallel_eval(net)
+        if args.inference_speed_profile == 'MC_dropout':
+            for m in net.modules():
+                if m.__class__.__name__.startswith('Dropout'): m.train()
+
+        cudnn.benchmark = True
+
+        dummy_input = torch.zeros(32, 3, 224, 224).cuda(args.gpu)
+
+        with torch.no_grad():
+            for i in range(200):
+                if i == 100:
+                    time0 = time.time()
+                if args.inference_speed_profile == 'LMFVI' or args.inference_speed_profile == 'libre' or args.inference_speed_profile== 'DNN':
+                    outputs = net(dummy_input)
+                else:
+                    outputs = []
+                    for j in range(args.num_mc_samples):
+                        outputs.append(net(dummy_input))
+                    outputs = torch.stack(outputs, 1)
+                if args.inference_speed_profile== 'DNN':
+                    assert(outputs.dim() == 2 and outputs.size(0) == 32)
+                else:
+                    assert(outputs.dim() == 3 and outputs.size(1) == args.num_mc_samples)
+        time1 = time.time()
+        print((time1 - time0) / 100.)
+        exit()
 
     log = open(os.path.join(args.save_path, 'log_seed{}{}.txt'.format(
                args.manualSeed, '_eval' if args.evaluate else '')), 'w')
@@ -444,13 +495,14 @@ def evaluate(test_loader, sub_test_loader,
         if args.gpu == 0:
             print_log('NAT vs. {} --> {}'.format(attack_method, plot_mi(args.save_path, attack_method)), log)
 
-    for attack_method in args.attack_methods:
-        if 'L2' in attack_method or 'FGSM' in attack_method or 'BIM' in attack_method:
-            continue
-        ens_attack(sub_test_loader if sub_attack else test_loader,
-                   net, criterion, mean, std, stack_kernel, args, log, attack_method, attack_model=attack_net)
-        if args.gpu == 0:
-            print_log('NAT vs. {} from {} --> {}'.format(attack_method + "_transferred", args.transferred_attack_arch, plot_mi(args.save_path, attack_method + "_transferred")), log)
+    if args.mimicry == 0:
+        for attack_method in args.attack_methods:
+            if 'L2' in attack_method or 'FGSM' in attack_method or 'BIM' in attack_method:
+                continue
+            ens_attack(sub_test_loader if sub_attack else test_loader,
+                       net, criterion, mean, std, stack_kernel, args, log, attack_method, attack_model=attack_net)
+            if args.gpu == 0:
+                print_log('NAT vs. {} from {} --> {}'.format(attack_method + "_transferred", args.transferred_attack_arch, plot_mi(args.save_path, attack_method + "_transferred")), log)
 
     return top1, val_loss
 
@@ -556,12 +608,15 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
             with attack_model.no_sync():
                 with torch.enable_grad():
                     X.requires_grad_()
-                    outputs = attack_model(X.sub(mean).div(std)).softmax(-1)
+                    features, outputs = attack_model(X.sub(mean).div(std), return_features=True)
+                    outputs = outputs.softmax(-1)
                     if outputs.dim() == 3:
                         output = outputs.mean(-2) + 1e-10
                     else:
                         output = outputs
                     loss = F.cross_entropy(output.log(), y, reduction='none')
+                    if args.mimicry != 0.:
+                        loss -= features.var(dim=1).mean(dim=[1,2,3]) * args.mimicry
                     grad_ = torch.autograd.grad(
                         [loss], [X], grad_outputs=torch.ones_like(loss),
                         retain_graph=False)[0].detach()
@@ -698,7 +753,8 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
             if X_cw.grad is not None: del X_cw.grad
             X_cw.grad = None
             with torch.enable_grad():
-                outputs = attack_model(X_cw.sub(mean).div(std)).softmax(-1)
+                features, outputs = attack_model(X_cw.sub(mean).div(std), return_features=True)
+                outputs = outputs.softmax(-1)
                 if outputs.dim() == 3:
                     logits = (outputs.mean(-2) + 1e-10).log()
                 else:
@@ -707,6 +763,8 @@ def ens_attack(val_loader, model, criterion, mean, std, stack_kernel, args, log,
                 logit_other = torch.max(
                     (1 - y_one_hot) * logits - 1e6 * y_one_hot, 1)[0]
                 loss = torch.mean(logit_other - logit_target)
+                if args.mimicry != 0.:
+                    loss -= features.var(dim=1).mean() * args.mimicry
                 loss.backward()
 
             X_cw += args.step_size * X_cw.grad.sign()

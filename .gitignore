@@ -7,3 +7,6 @@ reproduction/models/__pycache__
 reproduction/dataset/__pycache__
 mean_field_layers/__pycache__
 data
+exps/launch1.sh
+exps/baselines/lid_face.py
+exps/baselines/model_irse_lid.py

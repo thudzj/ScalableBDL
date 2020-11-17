@@ -197,6 +197,36 @@ NAT vs. TIM_transferred from resnet152 --> auroc: 0.9824; TPR: 0.7283 @ FPR=0.01
 NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.9998; TPR: 0.9994 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000
 NAT vs. spsa --> auroc: 0.9688; TPR: 0.8238 @ FPR=0.0100; TPR: 0.8959 @ FPR=0.0500; TPR: 0.9260 @ FPR=0.1000 (CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python spsa_imagenet.py --save-path /data/zhijie/snapshots_ba/emp-nores-blur.03-6epoch-mineps.5)
 
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --data_path /data/chenjianfei/imagenet --save_path /data/dengzhijie/snapshots_ba/ --job-id emp-nores-blur.03-6epoch-mineps.5-2 --posterior_type emp --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --resume auto --evaluate --unc_metric softmax_var --dist-port 6789(10011)
+Parallel ensemble 20 TOP1: 76.1940, TOP5: 92.9840, LOS: 0.9841, ECE: 0.0497
+NAT vs. FGSM --> auroc: 0.7085; TPR: 0.0145 @ FPR=0.0100; TPR: 0.0320 @ FPR=0.0500; TPR: 0.0519 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.1077; TPR: 0.0082 @ FPR=0.0100; TPR: 0.0143 @ FPR=0.0500; TPR: 0.0175 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 0.3253; TPR: 0.0912 @ FPR=0.0100; TPR: 0.1357 @ FPR=0.0500; TPR: 0.1579 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.3617; TPR: 0.1068 @ FPR=0.0100; TPR: 0.1597 @ FPR=0.0500; TPR: 0.1845 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.2214; TPR: 0.0447 @ FPR=0.0100; TPR: 0.0585 @ FPR=0.0500; TPR: 0.0666 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.1830; TPR: 0.0273 @ FPR=0.0100; TPR: 0.0377 @ FPR=0.0500; TPR: 0.0450 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.6508; TPR: 0.0032 @ FPR=0.0100; TPR: 0.0058 @ FPR=0.0500; TPR: 0.0082 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.9224; TPR: 0.3007 @ FPR=0.0100; TPR: 0.5767 @ FPR=0.0500; TPR: 0.7283 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.2768; TPR: 0.0729 @ FPR=0.0100; TPR: 0.1163 @ FPR=0.0500; TPR: 0.1370 @ FPR=0.1000  50000-50000
+NAT vs. PGD_L2 --> auroc: 0.2893; TPR: 0.0826 @ FPR=0.0100; TPR: 0.1283 @ FPR=0.0500; TPR: 0.1504 @ FPR=0.1000  50000-50000
+NAT vs. CW_transferred from resnet152 --> auroc: 0.7616; TPR: 0.1005 @ FPR=0.0100; TPR: 0.1606 @ FPR=0.0500; TPR: 0.2051 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.7689; TPR: 0.1122 @ FPR=0.0100; TPR: 0.1830 @ FPR=0.0500; TPR: 0.2308 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.8450; TPR: 0.2259 @ FPR=0.0100; TPR: 0.3556 @ FPR=0.0500; TPR: 0.4421 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.7657; TPR: 0.2147 @ FPR=0.0100; TPR: 0.4023 @ FPR=0.0500; TPR: 0.4943 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.6679; TPR: 0.0080 @ FPR=0.0100; TPR: 0.0148 @ FPR=0.0500; TPR: 0.0207 @ FPR=0.1000  50000-50000
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id mimicry --posterior_type emp --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --resume /data/zhijie/snapshots_ba/emp-nores-blur.03-6epoch-mineps.5-2/checkpoint.pth.tar --evaluate --mimicry 1.
+Parallel ensemble 20 TOP1: 76.1940, TOP5: 92.9840, LOS: 0.9841, ECE: 0.0497
+NAT vs. FGSM --> auroc: 0.9996; TPR: 0.9980 @ FPR=0.0100; TPR: 0.9992 @ FPR=0.0500; TPR: 0.9995 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.0363; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0001 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 0.2374; TPR: 0.0072 @ FPR=0.0100; TPR: 0.0188 @ FPR=0.0500; TPR: 0.0313 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.2211; TPR: 0.0012 @ FPR=0.0100; TPR: 0.0048 @ FPR=0.0500; TPR: 0.0114 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.1627; TPR: 0.0043 @ FPR=0.0100; TPR: 0.0108 @ FPR=0.0500; TPR: 0.0190 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.1990; TPR: 0.0075 @ FPR=0.0100; TPR: 0.0192 @ FPR=0.0500; TPR: 0.0309 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.9998; TPR: 0.9994 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.9627; TPR: 0.8093 @ FPR=0.0100; TPR: 0.9087 @ FPR=0.0500; TPR: 0.9311 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.2537; TPR: 0.0080 @ FPR=0.0100; TPR: 0.0226 @ FPR=0.0500; TPR: 0.0352 @ FPR=0.1000  50000-50000
+NAT vs. PGD_L2 --> auroc: 0.2213; TPR: 0.0029 @ FPR=0.0100; TPR: 0.0106 @ FPR=0.0500; TPR: 0.0211 @ FPR=0.1000  50000-50000
 
 abl
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id emp-nores-nou-6epoch --posterior_type emp --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --alpha 0 (gpu35)
@@ -370,6 +400,19 @@ Parallel ensemble 20 cfp_ff: 0.9911
 Parallel ensemble 20 cfp_fp: 0.9577
 
 
+abl with alpha=1
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_softmax-mfg-reg0 --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head Softmax --alpha 0 (gpu35)
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_arc-mfg-reg0 --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head ArcFace --alpha 0 (gpu35)
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_cos-mfg-reg0 --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head CosFace --alpha 0 (gpu16)
+
+abl with mc_dropout (gpu35)
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_softmax-mcd --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head Softmax  --mc_dropout
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_cos-mcd --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head CosFace  --mc_dropout
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_arc-mcd --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head ArcFace  --mc_dropout
+
+
 ------------------coco detection-----------------------
 DNN
 # Class      Images     Targets           P           R      mAP@.5  mAP@.5:.95
@@ -388,28 +431,343 @@ python train.py --data coco.yaml --cfg yolov5s.yaml --weights yolov5s.pt --batch
 NAT vs. fgsm --> auroc: 0.8105; TPR: 0.0750 @ FPR=0.0100; TPR: 0.2538 @ FPR=0.0500; TPR: 0.4132 @ FPR=0.1000
 NAT vs. bim --> auroc: 0.9813; TPR: 0.6470 @ FPR=0.0100; TPR: 0.9054 @ FPR=0.0500; TPR: 0.9628 @ FPR=0.1000
 NAT vs. mim --> auroc: 0.9876; TPR: 0.7544 @ FPR=0.0100; TPR: 0.9428 @ FPR=0.0500; TPR: 0.9786 @ FPR=0.1000
-NAT vs. bim --> auroc: 0.9810; TPR: 0.6496 @ FPR=0.0100; TPR: 0.8990 @ FPR=0.0500; TPR: 0.9616 @ FPR=0.1000
+NAT vs. pgd --> auroc: 0.9810; TPR: 0.6496 @ FPR=0.0100; TPR: 0.8990 @ FPR=0.0500; TPR: 0.9616 @ FPR=0.1000
 
 
+python train.py --data coco.yaml --cfg yolov5s.yaml --weights yolov5s.pt --batch-size 32  --lr 0.001 --ft_lr 0.0001 --alpha 0.02  --epochs 4  --uncertainty_threshold 0.01
+0.322       0.651       0.544       0.344
+NAT vs. fgsm --> auroc: 0.9097; TPR: 0.2332 @ FPR=0.0100; TPR: 0.5360 @ FPR=0.0500; TPR: 0.7150 @ FPR=0.1000
+NAT vs. bim --> auroc: 0.9869; TPR: 0.7326 @ FPR=0.0100; TPR: 0.9412 @ FPR=0.0500; TPR: 0.9822 @ FPR=0.1000
+NAT vs. mim --> auroc: 0.9923; TPR: 0.8428 @ FPR=0.0100; TPR: 0.9722 @ FPR=0.0500; TPR: 0.9940 @ FPR=0.1000
+NAT vs. pgd --> auroc: 0.9939; TPR: 0.8778 @ FPR=0.0100; TPR: 0.9834 @ FPR=0.0500; TPR: 0.9950 @ FPR=0.1000
 
 
+### use this
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train.py --data coco.yaml --cfg yolov5s.yaml --weights yolov5s.pt --batch-size 32  --lr 0.001 --ft_lr 0.0001 --alpha 0.02  --epochs 4  --uncertainty_threshold 0.02
+ 0.322       0.654       0.545       0.344
+NAT vs. fgsm --> auroc: 0.9567; TPR: 0.3986 @ FPR=0.0100; TPR: 0.7792 @ FPR=0.0500; TPR: 0.8840 @ FPR=0.1000
+NAT vs. bim --> auroc: 0.9362; TPR: 0.1824 @ FPR=0.0100; TPR: 0.6322 @ FPR=0.0500; TPR: 0.8052 @ FPR=0.1000
+NAT vs. mim --> auroc: 0.9662; TPR: 0.3528 @ FPR=0.0100; TPR: 0.8182 @ FPR=0.0500; TPR: 0.9236 @ FPR=0.1000
+NAT vs. pgd --> auroc: 0.9723; TPR: 0.4104 @ FPR=0.0100; TPR: 0.8552 @ FPR=0.0500; TPR: 0.9406 @ FPR=0.1000
 
-mc dropout with output mutual information
-CUDA_VISIBLE_DEVICES=0,6 python mc_dropout.py --batch_size 128 --attack_methods PGD --unc_metric mi --job-id tmp
-NAT vs. PGD --> auroc: 0.0438; TPR: 0.0001 @ FPR=0.0100; TPR: 0.0004 @ FPR=0.0500; TPR: 0.0010 @ FPR=0.1000
+
+CUDA_VISIBLE_DEVICES=0,5,6,7 python mc_dropout.py --job-id mc_dropout --batch_size 128 --unc_metric softmax_var (gpu29)
+Parallel ensemble 20 TOP1: 74.8560, TOP5: 92.3300, LOS: 0.9911
+NAT vs. FGSM --> auroc: 0.7589; TPR: 0.0240 @ FPR=0.0100; TPR: 0.1297 @ FPR=0.0500; TPR: 0.2569 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.0137; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0002 @ FPR=0.0500; TPR: 0.0002 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 0.0460; TPR: 0.0013 @ FPR=0.0100; TPR: 0.0027 @ FPR=0.0500; TPR: 0.0042 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.0499; TPR: 0.0013 @ FPR=0.0100; TPR: 0.0033 @ FPR=0.0500; TPR: 0.0047 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.0591; TPR: 0.0034 @ FPR=0.0100; TPR: 0.0068 @ FPR=0.0500; TPR: 0.0093 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.0809; TPR: 0.0051 @ FPR=0.0100; TPR: 0.0106 @ FPR=0.0500; TPR: 0.0146 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.7522; TPR: 0.0402 @ FPR=0.0100; TPR: 0.1775 @ FPR=0.0500; TPR: 0.3093 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.7565; TPR: 0.0169 @ FPR=0.0100; TPR: 0.1051 @ FPR=0.0500; TPR: 0.2219 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.0481; TPR: 0.0012 @ FPR=0.0100; TPR: 0.0027 @ FPR=0.0500; TPR: 0.0039 @ FPR=0.1000  50000-50000
+NAT vs. PGD_L2 --> auroc: 0.0459; TPR: 0.0014 @ FPR=0.0100; TPR: 0.0028 @ FPR=0.0500; TPR: 0.0040 @ FPR=0.1000  50000-50000
+NAT vs. CW_transferred from resnet152 --> auroc: 0.6527; TPR: 0.0313 @ FPR=0.0100; TPR: 0.1252 @ FPR=0.0500; TPR: 0.2163 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.7024; TPR: 0.0557 @ FPR=0.0100; TPR: 0.1847 @ FPR=0.0500; TPR: 0.2965 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.7169; TPR: 0.0454 @ FPR=0.0100; TPR: 0.1777 @ FPR=0.0500; TPR: 0.2969 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.7234; TPR: 0.0412 @ FPR=0.0100; TPR: 0.1732 @ FPR=0.0500; TPR: 0.2976 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.6853; TPR: 0.0297 @ FPR=0.0100; TPR: 0.1342 @ FPR=0.0500; TPR: 0.2407 @ FPR=0.1000  50004-50004
 
 
-mc dropout:
-CUDA_VISIBLE_DEVICES=0,5,7 python mc_dropout.py --job-id mc_dropout --batch_size 96
-Parallel ensemble 20 TOP1: 74.8160, TOP5: 92.2460, LOS: 0.9922
-NAT vs. FGSM --> auroc: 0.6068; TPR: 0.0144 @ FPR=0.0100; TPR: 0.0846 @ FPR=0.0500; TPR: 0.1697 @ FPR=0.1000  50001-50001
-NAT vs. CW --> auroc: 0.9799; TPR: 0.7749 @ FPR=0.0100; TPR: 0.9062 @ FPR=0.0500; TPR: 0.9457 @ FPR=0.1000  50001-50001
-NAT vs. BIM --> auroc: 1.0000; TPR: 0.9999 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000  50001-50001
-
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python mc_dropout.py --data_path /data/chenjianfei/imagenet --save_path /data/dengzhijie/snapshots_ba --job-id mc_dropout_f --batch_size 256 --unc_metric feature_var  (10023)
+Parallel ensemble 20 TOP1: 74.7940, TOP5: 92.3000, LOS: 0.9919
+NAT vs. FGSM --> auroc: 0.6071; TPR: 0.0143 @ FPR=0.0100; TPR: 0.0835 @ FPR=0.0500; TPR: 0.1687 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.9797; TPR: 0.7752 @ FPR=0.0100; TPR: 0.9054 @ FPR=0.0500; TPR: 0.9459 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 1.0000; TPR: 0.9998 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 1.0000; TPR: 0.9997 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.9999; TPR: 0.9990 @ FPR=0.0100; TPR: 0.9997 @ FPR=0.0500; TPR: 0.9998 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.9994; TPR: 0.9946 @ FPR=0.0100; TPR: 0.9979 @ FPR=0.0500; TPR: 0.9986 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.6285; TPR: 0.0106 @ FPR=0.0100; TPR: 0.0794 @ FPR=0.0500; TPR: 0.1701 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.5774; TPR: 0.0074 @ FPR=0.0100; TPR: 0.0530 @ FPR=0.0500; TPR: 0.1179 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.9993; TPR: 0.9993 @ FPR=0.0100; TPR: 0.9993 @ FPR=0.0500; TPR: 0.9993 @ FPR=0.1000  50000-50000
+NAT vs. PGD_L2 --> auroc: 0.9994; TPR: 0.9994 @ FPR=0.0100; TPR: 0.9994 @ FPR=0.0500; TPR: 0.9994 @ FPR=0.1000  50000-50000
+NAT vs. CW_transferred from resnet152 --> auroc: 0.5949; TPR: 0.0101 @ FPR=0.0100; TPR: 0.0646 @ FPR=0.0500; TPR: 0.1398 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.6609; TPR: 0.0185 @ FPR=0.0100; TPR: 0.1054 @ FPR=0.0500; TPR: 0.2084 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.7230; TPR: 0.0232 @ FPR=0.0100; TPR: 0.1417 @ FPR=0.0500; TPR: 0.2746 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.6957; TPR: 0.0160 @ FPR=0.0100; TPR: 0.1168 @ FPR=0.0500; TPR: 0.2374 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.6052; TPR: 0.0076 @ FPR=0.0100; TPR: 0.0625 @ FPR=0.0500; TPR: 0.1402 @ FPR=0.1000  50000-50000
 
 mfg:
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id mfg-full-blur.03-6epoch-mineps.5 --posterior_type mfg --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --full --resume auto --evaluate --batch_size 128
-Parallel ensemble 20 TOP1: 76.0320, TOP5: 92.9620, LOS: 0.9500, ECE: 0.0203
-NAT vs. FGSM --> auroc: 0.9867; TPR: 0.6268 @ FPR=0.0100; TPR: 0.9650 @ FPR=0.0500; TPR: 0.9886 @ FPR=0.1000  50000-50000
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --job-id mfg-full-blur.03-6epoch-mineps.5 --posterior_type mfg --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --full --resume auto --evaluate --batch_size 128 (35)
+Parallel ensemble 20 TOP1: 76.0780, TOP5: 92.9460, LOS: 0.9507, ECE: 0.0209
+NAT vs. FGSM --> auroc: 0.9864; TPR: 0.6291 @ FPR=0.0100; TPR: 0.9648 @ FPR=0.0500; TPR: 0.9885 @ FPR=0.1000  50000-50000
 NAT vs. CW --> auroc: 0.9427; TPR: 0.4998 @ FPR=0.0100; TPR: 0.7512 @ FPR=0.0500; TPR: 0.8474 @ FPR=0.1000  50000-50000
 NAT vs. BIM --> auroc: 0.9999; TPR: 0.9990 @ FPR=0.0100; TPR: 0.9998 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.9994; TPR: 0.9866 @ FPR=0.0100; TPR: 0.9984 @ FPR=0.0500; TPR: 0.9996 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.9999; TPR: 0.9975 @ FPR=0.0100; TPR: 0.9996 @ FPR=0.0500; TPR: 0.9998 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.9993; TPR: 0.9910 @ FPR=0.0100; TPR: 0.9975 @ FPR=0.0500; TPR: 0.9988 @ FPR=0.1000  50000-50000
+[NAT vs. DI_MIM --> auroc: 0.9922; TPR: 0.7833 @ FPR=0.0100; TPR: 0.9951 @ FPR=0.0500; TPR: 0.9983 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.8604; TPR: 0.0510 @ FPR=0.0100; TPR: 0.3165 @ FPR=0.0500; TPR: 0.5418 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.9938; TPR: 0.9925 @ FPR=0.0100; TPR: 0.9934 @ FPR=0.0500; TPR: 0.9935 @ FPR=0.1000  50000-49940
+NAT vs. PGD_L2 --> auroc: 0.9910; TPR: 0.9810 @ FPR=0.0100; TPR: 0.9897 @ FPR=0.0500; TPR: 0.9907 @ FPR=0.1000  50000-49950
+NAT vs. CW_transferred from resnet152 --> auroc: 0.9802; TPR: 0.5946 @ FPR=0.0100; TPR: 0.9270 @ FPR=0.0500; TPR: 0.9686 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.9842; TPR: 0.6605 @ FPR=0.0100; TPR: 0.9485 @ FPR=0.0500; TPR: 0.9778 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.9769; TPR: 0.5010 @ FPR=0.0100; TPR: 0.8951 @ FPR=0.0500; TPR: 0.9622 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.8854; TPR: 0.1702 @ FPR=0.0100; TPR: 0.4798 @ FPR=0.0500; TPR: 0.6519 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.9910; TPR: 0.7450 @ FPR=0.0100; TPR: 0.9893 @ FPR=0.0500; TPR: 0.9962 @ FPR=0.1000  50000-50000
+
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --data_path /data/chenjianfei/imagenet --save_path /data/dengzhijie/snapshots_ba --job-id mfg-full-nores-nou-6epoch --posterior_type mfg --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --alpha 0 --full  --batch_size 128 (10021)
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --data_path /data/chenjianfei/imagenet --save_path /data/dengzhijie/snapshots_ba --job-id mfg-full-nores-nou-6epoch --posterior_type mfg --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --alpha 0 --full  --batch_size 128 --resume auto --evaluate (10021)
+Parallel ensemble 20 TOP1: 75.2440, TOP5: 92.5800, LOS: 0.9976, ECE: 0.0247
+NAT vs. FGSM --> auroc: 0.1024; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0000 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.7804; TPR: 0.1867 @ FPR=0.0100; TPR: 0.3594 @ FPR=0.0500; TPR: 0.4688 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 0.9999; TPR: 0.9992 @ FPR=0.0100; TPR: 0.9997 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.9918; TPR: 0.8962 @ FPR=0.0100; TPR: 0.9573 @ FPR=0.0500; TPR: 0.9766 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.9998; TPR: 0.9977 @ FPR=0.0100; TPR: 0.9993 @ FPR=0.0500; TPR: 0.9996 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.9986; TPR: 0.9858 @ FPR=0.0100; TPR: 0.9953 @ FPR=0.0500; TPR: 0.9973 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.2984; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0000 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.3583; TPR: 0.0004 @ FPR=0.0100; TPR: 0.0045 @ FPR=0.0500; TPR: 0.0128 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.9520; TPR: 0.8992 @ FPR=0.0100; TPR: 0.9232 @ FPR=0.0500; TPR: 0.9410 @ FPR=0.1000  50000-49142
+NAT vs. PGD_L2 --> auroc: 0.9350; TPR: 0.8161 @ FPR=0.0100; TPR: 0.8806 @ FPR=0.0500; TPR: 0.9131 @ FPR=0.1000  50000-48852
+NAT vs. CW_transferred from resnet152 --> auroc: 0.2180; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0002 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.2413; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0002 @ FPR=0.0500; TPR: 0.0008 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.2050; TPR: 0.0002 @ FPR=0.0100; TPR: 0.0013 @ FPR=0.0500; TPR: 0.0039 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.5041; TPR: 0.0010 @ FPR=0.0100; TPR: 0.0115 @ FPR=0.0500; TPR: 0.0356 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.1504; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0000 @ FPR=0.1000  50000-50000
+
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --data_path /data/chenjianfei/imagenet --save_path /data/dengzhijie/snapshots_ba --job-id mfg-nores-blur.03-6epoch-mineps.5 --posterior_type mfg --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 (10023)
+Parallel ensemble 20 TOP1: 76.1660, TOP5: 93.0120, LOS: 0.9657, ECE: 0.0406
+NAT vs. FGSM --> auroc: 0.9896; TPR: 0.4411 @ FPR=0.0100; TPR: 0.9996 @ FPR=0.0500; TPR: 0.9997 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.9212; TPR: 0.5478 @ FPR=0.0100; TPR: 0.7832 @ FPR=0.0500; TPR: 0.8342 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 0.9837; TPR: 0.5498 @ FPR=0.0100; TPR: 0.9560 @ FPR=0.0500; TPR: 0.9796 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.9798; TPR: 0.6763 @ FPR=0.0100; TPR: 0.9377 @ FPR=0.0500; TPR: 0.9628 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.9924; TPR: 0.6939 @ FPR=0.0100; TPR: 0.9922 @ FPR=0.0500; TPR: 0.9981 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.9895; TPR: 0.5607 @ FPR=0.0100; TPR: 0.9926 @ FPR=0.0500; TPR: 0.9986 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.9891; TPR: 0.2770 @ FPR=0.0100; TPR: 1.0000 @ FPR=0.0500; TPR: 1.0000 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.8363; TPR: 0.4946 @ FPR=0.0100; TPR: 0.7044 @ FPR=0.0500; TPR: 0.7231 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.9833; TPR: 0.5121 @ FPR=0.0100; TPR: 0.9567 @ FPR=0.0500; TPR: 0.9799 @ FPR=0.1000  50000-50000
+NAT vs. PGD_L2 --> auroc: 0.9833; TPR: 0.6902 @ FPR=0.0100; TPR: 0.9513 @ FPR=0.0500; TPR: 0.9716 @ FPR=0.1000  50000-50000
+NAT vs. CW_transferred from resnet152 --> auroc: 0.9852; TPR: 0.5851 @ FPR=0.0100; TPR: 0.9899 @ FPR=0.0500; TPR: 0.9917 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.9844; TPR: 0.6090 @ FPR=0.0100; TPR: 0.9882 @ FPR=0.0500; TPR: 0.9901 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.9748; TPR: 0.7256 @ FPR=0.0100; TPR: 0.9623 @ FPR=0.0500; TPR: 0.9675 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.8609; TPR: 0.3179 @ FPR=0.0100; TPR: 0.5884 @ FPR=0.0500; TPR: 0.6506 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.9892; TPR: 0.3282 @ FPR=0.0100; TPR: 0.9999 @ FPR=0.0500; TPR: 0.9999 @ FPR=0.1000  50000-50000
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --data_path /data/chenjianfei/imagenet --save_path /data/dengzhijie/snapshots_ba --job-id mfg-nores-nou-6epoch --posterior_type mfg --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --alpha 0 (10021)
+Parallel ensemble 20 TOP1: 76.0580, TOP5: 92.9200, LOS: 0.9944, ECE: 0.0535
+NAT vs. FGSM --> auroc: 0.0294; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0000 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.7387; TPR: 0.1794 @ FPR=0.0100; TPR: 0.3221 @ FPR=0.0500; TPR: 0.4158 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 0.9918; TPR: 0.9076 @ FPR=0.0100; TPR: 0.9623 @ FPR=0.0500; TPR: 0.9782 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.9432; TPR: 0.6193 @ FPR=0.0100; TPR: 0.7724 @ FPR=0.0500; TPR: 0.8391 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.9962; TPR: 0.9332 @ FPR=0.0100; TPR: 0.9816 @ FPR=0.0500; TPR: 0.9921 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.9971; TPR: 0.9467 @ FPR=0.0100; TPR: 0.9872 @ FPR=0.0500; TPR: 0.9952 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.0210; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0000 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.2514; TPR: 0.0002 @ FPR=0.0100; TPR: 0.0013 @ FPR=0.0500; TPR: 0.0034 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.9929; TPR: 0.9222 @ FPR=0.0100; TPR: 0.9672 @ FPR=0.0500; TPR: 0.9813 @ FPR=0.1000  50000-50000
+NAT vs. PGD_L2 --> auroc: 0.9460; TPR: 0.6524 @ FPR=0.0100; TPR: 0.7914 @ FPR=0.0500; TPR: 0.8510 @ FPR=0.1000  50000-50000
+NAT vs. CW_transferred from resnet152 --> auroc: 0.1030; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0002 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.1252; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0001 @ FPR=0.0500; TPR: 0.0005 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.2002; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0012 @ FPR=0.0500; TPR: 0.0038 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.5107; TPR: 0.0012 @ FPR=0.0100; TPR: 0.0128 @ FPR=0.0500; TPR: 0.0395 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.0182; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0000 @ FPR=0.0500; TPR: 0.0000 @ FPR=0.1000  50000-50000
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_imagenet.py --data_path /data/chenjianfei/imagenet --save_path /data/dengzhijie/snapshots_ba --job-id emp-nores-blur.03-6epoch-mineps.5-batchwise --posterior_type emp --blur_prob 0.03 --epochs 6 --epsilon_min_train 0.5 --batchwise_sample --dist-port 6789 (10011)
+Parallel ensemble 20 TOP1: 76.0680, TOP5: 91.2120, LOS: 1.0841, ECE: 0.1187
+NAT vs. FGSM --> auroc: 0.4334; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0010 @ FPR=0.0500; TPR: 0.0055 @ FPR=0.1000  50000-50000
+NAT vs. CW --> auroc: 0.8199; TPR: 0.2469 @ FPR=0.0100; TPR: 0.4049 @ FPR=0.0500; TPR: 0.5078 @ FPR=0.1000  50000-50000
+NAT vs. BIM --> auroc: 0.9605; TPR: 0.7097 @ FPR=0.0100; TPR: 0.8378 @ FPR=0.0500; TPR: 0.8907 @ FPR=0.1000  50000-50000
+NAT vs. PGD --> auroc: 0.8867; TPR: 0.3812 @ FPR=0.0100; TPR: 0.5690 @ FPR=0.0500; TPR: 0.6743 @ FPR=0.1000  50000-50000
+NAT vs. MIM --> auroc: 0.9650; TPR: 0.7068 @ FPR=0.0100; TPR: 0.8464 @ FPR=0.0500; TPR: 0.9010 @ FPR=0.1000  50000-50000
+NAT vs. TIM --> auroc: 0.9797; TPR: 0.7890 @ FPR=0.0100; TPR: 0.9042 @ FPR=0.0500; TPR: 0.9438 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM --> auroc: 0.2471; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0001 @ FPR=0.0500; TPR: 0.0003 @ FPR=0.1000  50000-50000
+NAT vs. FGSM_L2 --> auroc: 0.7900; TPR: 0.0217 @ FPR=0.0100; TPR: 0.1575 @ FPR=0.0500; TPR: 0.3289 @ FPR=0.1000  50000-50000
+NAT vs. BIM_L2 --> auroc: 0.9662; TPR: 0.7344 @ FPR=0.0100; TPR: 0.8571 @ FPR=0.0500; TPR: 0.9062 @ FPR=0.1000  50000-50000
+NAT vs. PGD_L2 --> auroc: 0.8805; TPR: 0.3770 @ FPR=0.0100; TPR: 0.5607 @ FPR=0.0500; TPR: 0.6645 @ FPR=0.1000  50000-50000
+NAT vs. CW_transferred from resnet152 --> auroc: 0.4051; TPR: 0.0001 @ FPR=0.0100; TPR: 0.0013 @ FPR=0.0500; TPR: 0.0060 @ FPR=0.1000  50000-50000
+NAT vs. PGD_transferred from resnet152 --> auroc: 0.4237; TPR: 0.0002 @ FPR=0.0100; TPR: 0.0029 @ FPR=0.0500; TPR: 0.0109 @ FPR=0.1000  50000-50000
+NAT vs. MIM_transferred from resnet152 --> auroc: 0.6551; TPR: 0.0017 @ FPR=0.0100; TPR: 0.0259 @ FPR=0.0500; TPR: 0.0813 @ FPR=0.1000  50000-50000
+NAT vs. TIM_transferred from resnet152 --> auroc: 0.8295; TPR: 0.0852 @ FPR=0.0100; TPR: 0.3063 @ FPR=0.0500; TPR: 0.4854 @ FPR=0.1000  50000-50000
+NAT vs. DI_MIM_transferred from resnet152 --> auroc: 0.3071; TPR: 0.0000 @ FPR=0.0100; TPR: 0.0001 @ FPR=0.0500; TPR: 0.0004 @ FPR=0.1000  50000-50000
+
+
+
+
+
+
+
+
+
+CUDA_VISIBLE_DEVICES=6 python lid_face.py --batch_size 64
+
+agedb_30-lid
+Detector ROC-AUC score: 0.9169, accuracy: 0.8367, precision: 0.7735, recall: 0.7107
+Detector ROC-AUC score: 0.9974, accuracy: 0.9750, precision: 0.9653, recall: 0.9570
+Detector ROC-AUC score: 0.9960, accuracy: 0.9692, precision: 0.9536, recall: 0.9559
+Detector ROC-AUC score: 0.9966, accuracy: 0.9714, precision: 0.9672, recall: 0.9473
+Detector ROC-AUC score: 0.9944, accuracy: 0.9650, precision: 0.9511, recall: 0.9396
+Detector ROC-AUC score: 0.8587, accuracy: 0.7847, precision: 0.7137, recall: 0.6038
+Detector ROC-AUC score: 0.9304, accuracy: 0.8508, precision: 0.7959, recall: 0.7549
+Detector ROC-AUC score: 0.9985, accuracy: 0.9822, precision: 0.9765, recall: 0.9681
+Detector ROC-AUC score: 0.9989, accuracy: 0.9850, precision: 0.9800, recall: 0.9751
+
+agedb_30-kmeans
+Detector ROC-AUC score: 0.6519, accuracy: 0.6528, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.9951, accuracy: 0.9886, precision: 0.9974, recall: 0.9682
+Detector ROC-AUC score: 0.9883, accuracy: 0.9719, precision: 0.9912, recall: 0.9249
+Detector ROC-AUC score: 0.9699, accuracy: 0.9425, precision: 0.9840, recall: 0.8459
+Detector ROC-AUC score: 0.9589, accuracy: 0.9267, precision: 0.9719, recall: 0.8040
+Detector ROC-AUC score: 0.5934, accuracy: 0.6750, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.6515, accuracy: 0.6672, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.9976, accuracy: 0.9917, precision: 0.9991, recall: 0.9754
+Detector ROC-AUC score: 0.9949, accuracy: 0.9883, precision: 0.9959, recall: 0.9702
+
+cfp_fp-lid
+Detector ROC-AUC score: 0.9179, accuracy: 0.8293, precision: 0.7606, recall: 0.7099
+Detector ROC-AUC score: 0.9884, accuracy: 0.9517, precision: 0.9293, recall: 0.9260
+Detector ROC-AUC score: 0.9871, accuracy: 0.9412, precision: 0.9166, recall: 0.9122
+Detector ROC-AUC score: 0.9883, accuracy: 0.9479, precision: 0.9211, recall: 0.9230
+Detector ROC-AUC score: 0.9845, accuracy: 0.9371, precision: 0.9022, recall: 0.9074
+Detector ROC-AUC score: 0.8995, accuracy: 0.8117, precision: 0.7423, recall: 0.6583
+Detector ROC-AUC score: 0.9436, accuracy: 0.8660, precision: 0.8112, recall: 0.7743
+Detector ROC-AUC score: 0.9914, accuracy: 0.9576, precision: 0.9359, recall: 0.9359
+Detector ROC-AUC score: 0.9940, accuracy: 0.9602, precision: 0.9360, recall: 0.9459
+
+cfp_fp-kmeans
+Detector ROC-AUC score: 0.5556, accuracy: 0.6612, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.9853, accuracy: 0.9738, precision: 0.9898, recall: 0.9287
+Detector ROC-AUC score: 0.9639, accuracy: 0.9493, precision: 0.9792, recall: 0.8621
+Detector ROC-AUC score: 0.9370, accuracy: 0.9176, precision: 0.9530, recall: 0.7965
+Detector ROC-AUC score: 0.9159, accuracy: 0.8905, precision: 0.9385, recall: 0.7257
+Detector ROC-AUC score: 0.4760, accuracy: 0.6721, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.5569, accuracy: 0.6657, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.9936, accuracy: 0.9836, precision: 0.9913, recall: 0.9599
+Detector ROC-AUC score: 0.9887, accuracy: 0.9810, precision: 0.9911, recall: 0.9515
+
+cfp_ff-lid
+Detector ROC-AUC score: 0.9034, accuracy: 0.8074, precision: 0.7078, recall: 0.6885
+Detector ROC-AUC score: 0.9946, accuracy: 0.9690, precision: 0.9591, recall: 0.9482
+Detector ROC-AUC score: 0.9958, accuracy: 0.9700, precision: 0.9569, recall: 0.9513
+Detector ROC-AUC score: 0.9918, accuracy: 0.9602, precision: 0.9390, recall: 0.9410
+Detector ROC-AUC score: 0.9919, accuracy: 0.9543, precision: 0.9407, recall: 0.9220
+Detector ROC-AUC score: 0.8595, accuracy: 0.7419, precision: 0.6444, recall: 0.5302
+Detector ROC-AUC score: 0.9299, accuracy: 0.8381, precision: 0.7698, recall: 0.7277
+Detector ROC-AUC score: 0.9960, accuracy: 0.9738, precision: 0.9623, recall: 0.9596
+Detector ROC-AUC score: 0.9976, accuracy: 0.9762, precision: 0.9685, recall: 0.9618
+
+cfp_ff-kmeans
+Detector ROC-AUC score: 0.6285, accuracy: 0.6662, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.9761, accuracy: 0.9469, precision: 0.9670, recall: 0.8716
+Detector ROC-AUC score: 0.9536, accuracy: 0.9221, precision: 0.9499, recall: 0.8034
+Detector ROC-AUC score: 0.8958, accuracy: 0.8483, precision: 0.8672, recall: 0.6458
+Detector ROC-AUC score: 0.8449, accuracy: 0.7960, precision: 0.7568, recall: 0.5518
+Detector ROC-AUC score: 0.6057, accuracy: 0.6595, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.6423, accuracy: 0.6669, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.9844, accuracy: 0.9679, precision: 0.9932, recall: 0.9121
+Detector ROC-AUC score: 0.9841, accuracy: 0.9721, precision: 0.9917, recall: 0.9252
+
+lfw-lid
+Detector ROC-AUC score: 0.8683, accuracy: 0.7872, precision: 0.7449, recall: 0.5829
+Detector ROC-AUC score: 0.9984, accuracy: 0.9833, precision: 0.9792, recall: 0.9711
+Detector ROC-AUC score: 0.9964, accuracy: 0.9750, precision: 0.9725, recall: 0.9490
+Detector ROC-AUC score: 0.9957, accuracy: 0.9731, precision: 0.9653, recall: 0.9532
+Detector ROC-AUC score: 0.9974, accuracy: 0.9772, precision: 0.9649, recall: 0.9649
+Detector ROC-AUC score: 0.8883, accuracy: 0.8236, precision: 0.7791, recall: 0.6578
+Detector ROC-AUC score: 0.9122, accuracy: 0.8425, precision: 0.8002, recall: 0.7083
+Detector ROC-AUC score: 0.9989, accuracy: 0.9872, precision: 0.9824, recall: 0.9791
+Detector ROC-AUC score: 0.9990, accuracy: 0.9867, precision: 0.9757, recall: 0.9840
+
+lfw-kmeans
+Detector ROC-AUC score: 0.6710, accuracy: 0.6731, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 1.0000, accuracy: 0.9994, precision: 1.0000, recall: 0.9983
+Detector ROC-AUC score: 0.9994, accuracy: 0.9981, precision: 1.0000, recall: 0.9941
+Detector ROC-AUC score: 0.9821, accuracy: 0.9683, precision: 0.9884, recall: 0.9165
+Detector ROC-AUC score: 0.9824, accuracy: 0.9614, precision: 0.9899, recall: 0.8937
+Detector ROC-AUC score: 0.6250, accuracy: 0.6639, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.6960, accuracy: 0.6669, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 1.0000, accuracy: 0.9997, precision: 1.0000, recall: 0.9992
+Detector ROC-AUC score: 0.9998, accuracy: 0.9992, precision: 1.0000, recall: 0.9974
+
+calfw-lid
+Detector ROC-AUC score: 0.9419, accuracy: 0.8719, precision: 0.8224, recall: 0.7846
+Detector ROC-AUC score: 0.9995, accuracy: 0.9903, precision: 0.9887, recall: 0.9831
+Detector ROC-AUC score: 0.9987, accuracy: 0.9867, precision: 0.9775, recall: 0.9824
+Detector ROC-AUC score: 0.9979, accuracy: 0.9822, precision: 0.9780, recall: 0.9682
+Detector ROC-AUC score: 0.9977, accuracy: 0.9767, precision: 0.9681, recall: 0.9616
+Detector ROC-AUC score: 0.9401, accuracy: 0.8789, precision: 0.8256, recall: 0.8034
+Detector ROC-AUC score: 0.9646, accuracy: 0.9031, precision: 0.8600, recall: 0.8372
+Detector ROC-AUC score: 0.9994, accuracy: 0.9894, precision: 0.9883, recall: 0.9802
+Detector ROC-AUC score: 0.9996, accuracy: 0.9897, precision: 0.9834, recall: 0.9843
+
+calfw-kmeans
+Detector ROC-AUC score: 0.6804, accuracy: 0.6614, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 0.9997, precision: 1.0000, recall: 0.9991
+Detector ROC-AUC score: 1.0000, accuracy: 0.9994, precision: 1.0000, recall: 0.9983
+Detector ROC-AUC score: 1.0000, accuracy: 0.9997, precision: 1.0000, recall: 0.9992
+Detector ROC-AUC score: 0.5340, accuracy: 0.6647, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.7371, accuracy: 0.6944, precision: 0.5549, recall: 0.4170
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+
+cplfw-lid
+Detector ROC-AUC score: 0.8809, accuracy: 0.8028, precision: 0.7481, recall: 0.6416
+Detector ROC-AUC score: 0.9975, accuracy: 0.9750, precision: 0.9634, recall: 0.9618
+Detector ROC-AUC score: 0.9962, accuracy: 0.9700, precision: 0.9519, recall: 0.9583
+Detector ROC-AUC score: 0.9971, accuracy: 0.9753, precision: 0.9616, recall: 0.9640
+Detector ROC-AUC score: 0.9963, accuracy: 0.9708, precision: 0.9569, recall: 0.9577
+Detector ROC-AUC score: 0.8970, accuracy: 0.8181, precision: 0.7846, recall: 0.6544
+Detector ROC-AUC score: 0.9244, accuracy: 0.8536, precision: 0.7951, recall: 0.7475
+Detector ROC-AUC score: 0.9985, accuracy: 0.9850, precision: 0.9795, recall: 0.9763
+Detector ROC-AUC score: 0.9982, accuracy: 0.9794, precision: 0.9758, recall: 0.9629
+
+cplfw-kmeans
+Detector ROC-AUC score: 0.7358, accuracy: 0.6872, precision: 0.5393, recall: 0.4280
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 0.9992, precision: 0.9983, recall: 0.9992
+Detector ROC-AUC score: 0.6802, accuracy: 0.6717, precision: 0.0000, recall: 0.0000
+Detector ROC-AUC score: 0.8219, accuracy: 0.7553, precision: 0.6341, recall: 0.6626
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 0.9997, precision: 1.0000, recall: 0.9992
+
+vgg2_fp-lid
+Detector ROC-AUC score: 0.8653, accuracy: 0.7830, precision: 0.7162, recall: 0.5780
+Detector ROC-AUC score: 0.9991, accuracy: 0.9847, precision: 0.9786, recall: 0.9767
+Detector ROC-AUC score: 0.9988, accuracy: 0.9850, precision: 0.9853, recall: 0.9710
+Detector ROC-AUC score: 0.9978, accuracy: 0.9757, precision: 0.9710, recall: 0.9541
+Detector ROC-AUC score: 0.9969, accuracy: 0.9737, precision: 0.9585, recall: 0.9595
+Detector ROC-AUC score: 0.8816, accuracy: 0.8187, precision: 0.7526, recall: 0.6585
+Detector ROC-AUC score: 0.9124, accuracy: 0.8450, precision: 0.8026, recall: 0.7179
+Detector ROC-AUC score: 0.9993, accuracy: 0.9863, precision: 0.9854, recall: 0.9722
+Detector ROC-AUC score: 0.9989, accuracy: 0.9827, precision: 0.9770, recall: 0.9732
+
+vgg2_fp-kmeans
+Detector ROC-AUC score: 0.7835, accuracy: 0.7260, precision: 0.6013, recall: 0.5476
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 0.9996, accuracy: 0.9993, precision: 1.0000, recall: 0.9979
+Detector ROC-AUC score: 1.0000, accuracy: 0.9987, precision: 0.9990, recall: 0.9971
+Detector ROC-AUC score: 0.6994, accuracy: 0.6683, precision: 0.5186, recall: 0.3412
+Detector ROC-AUC score: 0.8593, accuracy: 0.7987, precision: 0.6805, recall: 0.7407
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+Detector ROC-AUC score: 1.0000, accuracy: 1.0000, precision: 1.0000, recall: 1.0000
+
+lid average roc:
+0.899228571429
+0.996414285714
+0.995571428571
+0.995028571429
+0.994157142857
+0.889242857143
+0.931071428571
+0.997428571429
+0.998028571429
+
+kmeans average roc:
+0.672385714286
+0.993785714286
+0.986457142857
+0.9692
+0.957442857143
+0.601957142857
+0.709285714286
+0.996514285714
+0.995357142857
