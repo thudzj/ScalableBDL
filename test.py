@@ -17,6 +17,8 @@ from utils.general import (
     xyxy2xywh, clip_coords, plot_images, xywh2xyxy, box_iou, output_to_target, ap_per_class, set_logging)
 from utils.torch_utils import select_device, time_synchronized
 
+from scalablebdl.empirical import to_bayesian as to_bayesian_emp
+from scalablebdl.bnn_utils import set_mc_sample_id, parallel_eval, disable_parallel_eval
 
 def test(data,
          weights=None,
@@ -72,6 +74,7 @@ def test(data,
 
     # Configure
     model.eval()
+    parallel_eval(model)
     with open(data) as f:
         data = yaml.load(f, Loader=yaml.FullLoader)  # model dict
     check_dataset(data)  # check
@@ -101,6 +104,7 @@ def test(data,
     p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
     loss = torch.zeros(3, device=device)
     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
+    mis = []
     for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
         img = img.to(device, non_blocking=True)
         img = img.half() if half else img.float()  # uint8 to fp16/32
@@ -113,17 +117,21 @@ def test(data,
         with torch.no_grad():
             # Run model
             t = time_synchronized()
-            inf_out, train_out = model(img, augment=augment)  # inference and training outputs
+            features, tmp = model(img, augment=augment, return_features=True)  # inference and training outputs
+            inf_out, train_out = tmp
             t0 += time_synchronized() - t
 
             # Compute loss
             if training:  # if model has loss hyperparameters
                 loss += compute_loss([x.float() for x in train_out], targets, model)[1][:3]  # box, obj, cls
+            mi = sum([p.var(dim=1).sum(dim=[1,2,3]) for p in features]) / sum([np.prod(list(p.shape)[2:]) for p in features])
+            mis.append(mi)
 
             # Run NMS
             t = time_synchronized()
             output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
             t1 += time_synchronized() - t
+
 
         # Statistics per image
         for si, pred in enumerate(output):
@@ -212,6 +220,9 @@ def test(data,
             f = save_dir / f'test_batch{batch_i}_pred.jpg'
             plot_images(img, output_to_target(output, width, height), paths, str(f), names)  # predictions
 
+    mis = torch.cat(mis)
+    np.save(os.path.join('./runs', 'mis.npy'), mis.data.cpu().numpy())
+
     # W&B logging
     if wandb_images:
         wandb.log({"outputs": wandb_images})
@@ -269,6 +280,8 @@ def test(data,
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
+
+    disable_parallel_eval(model)
     return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
 
 

@@ -65,7 +65,7 @@ class BottleneckCSP(nn.Module):
     def forward(self, x):
         y1 = self.cv3(self.m(self.cv1(x)))
         y2 = self.cv2(x)
-        return self.cv4(self.act(self.bn(torch.cat((y1, y2), dim=1))))
+        return self.cv4(self.act(self.bn(torch.cat((y1, y2), dim=1 if y1.dim() == 4 else 2))))
 
 
 class SPP(nn.Module):

@@ -3,6 +3,7 @@ import logging
 import sys
 from copy import deepcopy
 from pathlib import Path
+import numpy as np
 
 import math
 
@@ -17,6 +18,9 @@ from models.experimental import MixConv2d, CrossConv, C3
 from utils.general import check_anchor_order, make_divisible, check_file, set_logging
 from utils.torch_utils import time_synchronized, fuse_conv_and_bn, model_info, scale_img, initialize_weights, \
     select_device, copy_attr
+
+sys.path.append('../')
+from scalablebdl.bnn_utils import set_mc_sample_id
 
 
 class Detect(nn.Module):
@@ -95,8 +99,15 @@ class Model(nn.Module):
         self.info()
         print('')
 
-    def forward(self, x, augment=False, profile=False):
+    def forward(self, x, augment=False, profile=False, return_features=False):
+        if x.shape[0] > 1 and self.training:
+            mc_sample_id = np.concatenate([np.stack([np.random.choice(20, 2, replace=False) for _ in range(x.shape[0]//4)]).T.reshape(-1),
+                np.stack([np.random.choice(20, 2, replace=False) for _ in range(x.shape[0]//4)]).T.reshape(-1)])
+            set_mc_sample_id(self, 20, mc_sample_id)
+
+            # print(x.shape, (x[:4, ...] - x[4:8, ...]).abs().max(), (x[:4, ...] - x[8:12, ...]).abs().max(), (x[:4, ...] - x[12:, ...]).abs().max(), self.model[23].cv2.mc_sample_id)
         if augment:
+            assert False
             img_size = x.shape[-2:]  # height, width
             s = [1, 0.83, 0.67]  # scales
             f = [None, 3, None]  # flips (2-ud, 3-lr)
@@ -113,11 +124,12 @@ class Model(nn.Module):
                 y.append(yi)
             return torch.cat(y, 1), None  # augmented inference, train
         else:
-            return self.forward_once(x, profile)  # single-scale inference, train
+            return self.forward_once(x, profile, return_features=return_features)  # single-scale inference, train
 
-    def forward_once(self, x, profile=False):
+    def forward_once(self, x, profile=False, return_features=False):
         y, dt = [], []  # outputs
-        for m in self.model:
+        features = []
+        for m_i, m in enumerate(self.model):
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
 
@@ -132,13 +144,20 @@ class Model(nn.Module):
                     _ = m(x)
                 dt.append((time_synchronized() - t) * 100)
                 print('%10.1f%10.0f%10.1fms %-40s' % (o, m.np, dt[-1], m.type))
-
             x = m(x)  # run
+
+            if m_i == 17 or m_i == 20 or m_i == 23: #
+                features.append(x)
+                if x.dim() == 5:
+                    x = x.mean(1)
             y.append(x if m.i in self.save else None)  # save output
 
         if profile:
             print('%.1fms total' % sum(dt))
-        return x
+        if return_features:
+            return tuple(features), x
+        else:
+            return x
 
     def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency
         # https://arxiv.org/abs/1708.02002 section 3.3

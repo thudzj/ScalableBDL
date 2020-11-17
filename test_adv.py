@@ -19,26 +19,39 @@ from utils.general import (
     xyxy2xywh, clip_coords, plot_images, xywh2xyxy, box_iou, output_to_target, ap_per_class, set_logging)
 from utils.torch_utils import select_device, time_synchronized
 
+from scalablebdl.empirical import to_bayesian as to_bayesian_emp
+from scalablebdl.bnn_utils import set_mc_sample_id, parallel_eval, disable_parallel_eval
 
-def _pgd_whitebox(model, img, targets, device):
-    model = model.eval()
+def _fgsm_whitebox(model, img, targets, device):
+    # model = model.eval()
+    epsilon = 16./255.
+
+    img_pgd = Variable(img.data.clone(), requires_grad=True)
+    opt = optim.SGD([img_pgd], lr=1e-3)
+    opt.zero_grad()
+    with torch.enable_grad():
+        inf_out, train_out = model(img_pgd, augment=False)  # inference and training outputs
+        loss, loss1 = compute_loss([x.float() for x in train_out], targets,  model if hasattr(model, 'hyp') else model.module)  # box, obj, cls
+        # print(loss, loss1)
+    loss.backward()
+    eta = epsilon * img_pgd.grad.data.sign()
+    img_pgd = Variable(img.data + eta, requires_grad=True)
+    img_pgd = Variable(torch.clamp(img_pgd, 0, 1.0), requires_grad=True)
+    return img_pgd
+
+def _bim_whitebox(model, img, targets, device):
+    # model = model.eval()
     epsilon = 16./255.
     step_size = 1./255.
     num_steps = 20
-    random = True
-    print(img.shape, img.dtype)
-    
+
     img_pgd = Variable(img.data.clone(), requires_grad=True)
-    if random:
-        random_noise = torch.FloatTensor(*img_pgd.shape).uniform_(-epsilon, epsilon).to(device)
-        img_pgd = Variable(img_pgd.data + random_noise, requires_grad=True)
-    
     for _ in range(num_steps):
         opt = optim.SGD([img_pgd], lr=1e-3)
         opt.zero_grad()
         with torch.enable_grad():
             inf_out, train_out = model(img_pgd, augment=False)  # inference and training outputs
-            loss, loss1 = compute_loss([x.float() for x in train_out], targets, model)  # box, obj, cls
+            loss, loss1 = compute_loss([x.float() for x in train_out], targets,  model if hasattr(model, 'hyp') else model.module)  # box, obj, cls
             # print(loss, loss1)
         loss.backward()
         eta = step_size * img_pgd.grad.data.sign()
@@ -46,7 +59,62 @@ def _pgd_whitebox(model, img, targets, device):
         eta = torch.clamp(img_pgd.data - img.data, -epsilon, epsilon)
         img_pgd = Variable(img.data + eta, requires_grad=True)
         img_pgd = Variable(torch.clamp(img_pgd, 0, 1.0), requires_grad=True)
-    
+
+    return img_pgd
+
+def _mim_whitebox(model, img, targets, device):
+    # model = model.eval()
+    epsilon = 16./255.
+    step_size = 1./255.
+    num_steps = 20
+
+    img_pgd = Variable(img.data.clone(), requires_grad=True)
+    g = torch.zeros_like(img_pgd)
+    for _ in range(num_steps):
+        opt = optim.SGD([img_pgd], lr=1e-3)
+        opt.zero_grad()
+        with torch.enable_grad():
+            inf_out, train_out = model(img_pgd, augment=False)  # inference and training outputs
+            loss, loss1 = compute_loss([x.float() for x in train_out], targets,  model if hasattr(model, 'hyp') else model.module)  # box, obj, cls
+            # print(loss, loss1)
+        loss.backward()
+
+        g = g + img_pgd.grad.data / img_pgd.grad.data.abs().mean(dim=[1,2,3], keepdim=True)
+
+        eta = step_size * g.sign()
+        img_pgd = Variable(img_pgd.data + eta, requires_grad=True)
+        eta = torch.clamp(img_pgd.data - img.data, -epsilon, epsilon)
+        img_pgd = Variable(img.data + eta, requires_grad=True)
+        img_pgd = Variable(torch.clamp(img_pgd, 0, 1.0), requires_grad=True)
+
+    return img_pgd
+
+def _pgd_whitebox(model, img, targets, device):
+    # model = model.eval()
+    epsilon = 16./255.
+    step_size = 1./255.
+    num_steps = 20
+    random = True
+
+    img_pgd = Variable(img.data.clone(), requires_grad=True)
+    if random:
+        random_noise = torch.empty_like(img_pgd).uniform_(-epsilon, epsilon).to(device)
+        img_pgd = Variable(img_pgd.data + random_noise, requires_grad=True)
+
+    for _ in range(num_steps):
+        opt = optim.SGD([img_pgd], lr=1e-3)
+        opt.zero_grad()
+        with torch.enable_grad():
+            inf_out, train_out = model(img_pgd, augment=False)  # inference and training outputs
+            loss, loss1 = compute_loss([x.float() for x in train_out], targets,  model if hasattr(model, 'hyp') else model.module)  # box, obj, cls
+            # print(loss, loss1)
+        loss.backward()
+        eta = step_size * img_pgd.grad.data.sign()
+        img_pgd = Variable(img_pgd.data + eta, requires_grad=True)
+        eta = torch.clamp(img_pgd.data - img.data, -epsilon, epsilon)
+        img_pgd = Variable(img.data + eta, requires_grad=True)
+        img_pgd = Variable(torch.clamp(img_pgd, 0, 1.0), requires_grad=True)
+
     return img_pgd
 
 def test(data,
@@ -64,8 +132,9 @@ def test(data,
          save_dir=Path(''),  # for saving images
          save_txt=False,  # for auto-labelling
          save_conf=False,
-         plots=False,
-         log_imgs=0):  # number of logged images
+         plots=True,
+         log_imgs=0,
+         adv_attack=None):  # number of logged images
 
     # Initialize/load model and set device
     training = model is not None
@@ -97,13 +166,13 @@ def test(data,
         #     model = nn.DataParallel(model)
 
     # Half
-    # half = device.type != 'cpu'  # half precision only supported on CUDA
-    half = False
+    half = device.type != 'cpu'  # half precision only supported on CUDA
     if half:
         model.half()
 
     # Configure
     model.eval()
+    parallel_eval(model)
     with open(data) as f:
         data = yaml.load(f, Loader=yaml.FullLoader)  # model dict
     check_dataset(data)  # check
@@ -133,33 +202,45 @@ def test(data,
     p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
     loss = torch.zeros(3, device=device)
     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
+    mis = []
     for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
+        # if batch_i == 2:
+        #     break
         img = img.to(device, non_blocking=True)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         targets = targets.to(device)
         nb, _, height, width = img.shape  # batch size, channels, height, width
         whwh = torch.Tensor([width, height, width, height]).to(device)
-        # create adv
-        img_adv = _pgd_whitebox(model, img, targets, device)
 
         # Disable gradients
         with torch.no_grad():
             # Run model
             t = time_synchronized()
-            inf_out, train_out = model(img_adv, augment=augment)  # inference and training outputs
-            # print(inf_out.shape, train_out[0].shape, train_out[1].shape, train_out[2].shape)
-            
+            if adv_attack:
+                # model.float()
+                # img.float()
+                input = eval('_{}_whitebox'.format(adv_attack))(model, img, targets, device)
+                # if half: model.half()
+                input = input.half() if half else input.float()
+            else:
+                input = img
+            features, tmp = model(input, augment=augment, return_features=True)  # inference and training outputs
+            inf_out, train_out = tmp
             t0 += time_synchronized() - t
 
             # Compute loss
             if training:  # if model has loss hyperparameters
-                loss += compute_loss([x.float() for x in train_out], targets, model)[1][:3]  # box, obj, cls
+                loss += compute_loss([x.float() for x in train_out], targets, model if hasattr(model, 'hyp') else model.module)[1][:3]  # box, obj, cls
+            mi = sum([p.float().var(dim=1).sum(dim=[1,2,3]) for p in features]) / sum([np.prod(list(p.shape)[2:]) for p in features])
+            # print(mi.max(), mi.min())
+            mis.append(mi)
 
             # Run NMS
             t = time_synchronized()
             output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
             t1 += time_synchronized() - t
+
 
         # Statistics per image
         for si, pred in enumerate(output):
@@ -248,6 +329,12 @@ def test(data,
             f = save_dir / f'test_batch{batch_i}_pred.jpg'
             plot_images(img, output_to_target(output, width, height), paths, str(f), names)  # predictions
 
+    mis = torch.cat(mis)
+    if adv_attack:
+        np.save(os.path.join(save_dir, 'mis_{}.npy'.format(adv_attack)), mis.data.cpu().numpy())
+    else:
+        np.save(os.path.join(save_dir, 'mis.npy'), mis.data.cpu().numpy())
+
     # W&B logging
     if wandb_images:
         wandb.log({"outputs": wandb_images})
@@ -305,6 +392,8 @@ def test(data,
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
+
+    disable_parallel_eval(model)
     return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
 
 
@@ -312,7 +401,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='test.py')
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--data', type=str, default='data/coco.yaml', help='*.data path')
-    parser.add_argument('--batch-size', type=int, default=64, help='size of each image batch')
+    parser.add_argument('--batch-size', type=int, default=32, help='size of each image batch')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.001, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.65, help='IOU threshold for NMS')
