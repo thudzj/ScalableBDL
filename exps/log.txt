@@ -400,7 +400,7 @@ Parallel ensemble 20 cfp_ff: 0.9911
 Parallel ensemble 20 cfp_fp: 0.9577
 
 
-abl with alpha=1
+abl with alpha=0
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_softmax-mfg-reg0 --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head Softmax --alpha 0 (gpu35)
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_arc-mfg-reg0 --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head ArcFace --alpha 0 (gpu35)
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python finetune_face.py --job-id face_ir50_cos-mfg-reg0 --posterior_type mfg --epsilon_min_train 1 --epsilon_max_train 2 --blur_prob 0 --uncertainty_threshold 100 --arch IR_50 --head CosFace --alpha 0 (gpu16)
