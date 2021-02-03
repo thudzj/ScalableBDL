@@ -16,7 +16,7 @@ class _BayesConvNdLR(Module):
                      'out_channels', 'kernel_size', 'num_mc_samples', 'rank']
 
     def __init__(self, in_channels, out_channels, kernel_size, stride,
-                 padding, dilation, groups, bias, num_mc_samples, rank):
+                 padding, dilation, groups, bias, num_mc_samples, rank, pert_init_std):
         super(_BayesConvNdLR, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -32,16 +32,18 @@ class _BayesConvNdLR(Module):
         self.dilation = dilation
         self.groups = groups
         self.mc_sample_id = None
+        self.deterministic = False
         self.num_mc_samples = num_mc_samples
         self.rank = rank
+        self.pert_init_std = pert_init_std
 
-        self.weight = Parameter(torch.Tensor(out_channels,
+        self.weight_mu = Parameter(torch.Tensor(out_channels,
                                 in_channels // groups, *self.kernel_size))
         self.in_perturbations = Parameter(torch.Tensor(num_mc_samples, rank,
                                           in_channels//groups*np.prod(list( self.kernel_size))))
         self.out_perturbations = Parameter(torch.Tensor(num_mc_samples,
                                                         out_channels, rank))
-        self.weight_size = list(self.weight.shape)
+        self.weight_size = list(self.weight_mu.shape)
 
         if bias is None or bias is False:
             self.register_parameter('bias', None)
@@ -53,11 +55,13 @@ class _BayesConvNdLR(Module):
         n = self.in_channels
         n *= np.prod(list(self.kernel_size))
         stdv = 1.0 / math.sqrt(n)
-        self.weight.data.uniform_(-stdv, stdv)
+        self.weight_mu.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
-        self.in_perturbations.data.fill_(math.sqrt(1./self.rank))
-        self.out_perturbations.data.fill_(math.sqrt(1./self.rank))
+        m = math.sqrt(1./self.rank)
+        v = math.sqrt((math.sqrt(self.rank*(self.pert_init_std**2)+1) - 1)/self.rank)
+        self.in_perturbations.data.normal_(m, v)
+        self.out_perturbations.data.normal_(m, v)
 
     def extra_repr(self):
         s = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
@@ -79,22 +83,27 @@ class BayesConv2dLR(_BayesConvNdLR):
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1, bias=False,
-                 num_mc_samples=20, rank=1):
+                 num_mc_samples=20, rank=1, pert_init_std=0.2):
         super(BayesConv2dLR, self).__init__(
             in_channels, out_channels, kernel_size, stride,
-            padding, dilation, groups, bias, num_mc_samples, rank)
+            padding, dilation, groups, bias, num_mc_samples, rank, pert_init_std)
         self.parallel_eval = False
 
     def forward(self, input):
         r"""
         Overriden.
         """
-        if self.parallel_eval:
+        if self.deterministic:
+            out = F.conv2d(input, weight=self.weight_mu,
+                           bias=self.bias,
+                           stride=self.stride, dilation=self.dilation,
+                           groups=self.groups, padding=self.padding)
+        elif self.parallel_eval:
             if input.dim() == 4:
                 input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
 
             perturbations = torch.bmm(self.out_perturbations, self.in_perturbations)
-            weight = self.weight * perturbations.view(self.num_mc_samples, *self.weight_size)
+            weight = perturbations.view(self.num_mc_samples, *self.weight_size).mul_(self.weight_mu)
             out = F.conv2d(input.flatten(start_dim=1, end_dim=2),
                            weight=weight.flatten(0, 1), bias=None,
                            stride=self.stride, dilation=self.dilation,
@@ -108,7 +117,7 @@ class BayesConv2dLR(_BayesConvNdLR):
             self.mc_sample_id %= self.num_mc_samples
             perturbations = torch.matmul(self.out_perturbations[self.mc_sample_id],
                 self.in_perturbations[self.mc_sample_id])
-            weight = self.weight * perturbations.view(*self.weight_size)
+            weight = perturbations.view(*self.weight_size).mul_(self.weight_mu)
             out = F.conv2d(input, weight=weight,
                            bias=self.bias,
                            stride=self.stride, dilation=self.dilation,
@@ -117,7 +126,7 @@ class BayesConv2dLR(_BayesConvNdLR):
             bs = input.shape[0]
             idx = torch.tensor(self.mc_sample_id, device=input.device, dtype=torch.long)
             perturbations = torch.bmm(self.out_perturbations[idx], self.in_perturbations[idx])
-            weight = self.weight * perturbations.view(bs, *self.weight_size)
+            weight = perturbations.view(bs, *self.weight_size).mul_(self.weight_mu)
             out = F.conv2d(input.view(1, -1, input.shape[2], input.shape[3]),
                            weight=weight.flatten(0, 1), bias=None,
                            stride=self.stride, dilation=self.dilation,
