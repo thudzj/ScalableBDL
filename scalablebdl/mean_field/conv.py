@@ -92,6 +92,10 @@ class BayesConv2dMF(_BayesConvNdMF):
         self.bias_size = list(self.bias_mu.shape) if self.bias else None
         self.mul_exp_add = MulExpAddFunction.apply
 
+        self.local_reparam = False
+        self.flipout = False
+        self.single_eps = False
+
     def forward(self, input):
         r"""
         Overriden.
@@ -101,32 +105,73 @@ class BayesConv2dMF(_BayesConvNdMF):
                             stride=self.stride, dilation=self.dilation,
                             groups=self.groups, padding=self.padding)
         elif not self.parallel_eval:
-            bs = input.shape[0]
-            weight = self.mul_exp_add(torch.randn(bs, *self.weight_size,
-                                                  device=input.device,
-                                                  dtype=input.dtype),
-                                      self.weight_psi, self.weight_mu).view(
-                                bs*self.weight_size[0], *self.weight_size[1:])
-            out = F.conv2d(input.view(1, -1, input.shape[2], input.shape[3]),
-                           weight=weight, bias=None,
-                           stride=self.stride, dilation=self.dilation,
-                           groups=self.groups*bs, padding=self.padding)
-            out = out.view(bs, self.out_channels, out.shape[2], out.shape[3])
+            if self.single_eps:
+                assert not self.bias
+                weight = torch.randn_like(self.weight_mu).mul_(self.weight_psi.exp()).add_(self.weight_mu)
+                out = F.conv2d(input, weight=weight, bias=None,
+                                stride=self.stride, dilation=self.dilation,
+                                groups=self.groups, padding=self.padding)
+            elif self.local_reparam:
+                assert not self.bias
+                act_mu = F.conv2d(input, weight=self.weight_mu, bias=None,
+                                  stride=self.stride, padding=self.padding,
+                                  dilation=self.dilation, groups=self.groups)
+                act_var = F.conv2d(input**2,
+                                  weight=(self.weight_psi*2).exp_(), bias=None,
+                                  stride=self.stride, padding=self.padding,
+                                  dilation=self.dilation, groups=self.groups)
+                act_std = act_var.clamp(1e-8).sqrt_()
+                # print(act_std.data.norm().item())
+                out =  torch.randn_like(act_mu).mul_(act_std).add_(act_mu)
+            elif self.flipout:
+                assert not self.bias
+                outputs = F.conv2d(input, weight=self.weight_mu, bias=None,
+                                   stride=self.stride, padding=self.padding,
+                                   dilation=self.dilation, groups=self.groups)
 
-            if self.bias:
-                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size,
-                                                    device=input.device,
-                                                    dtype=input.dtype),
-                                        self.bias_psi, self.bias_mu)
-                out = out + bias[:, :, None, None]
+                # sampling perturbation signs
+                sign_input = (torch.rand_like(input) - 0.5).sign()
+                sign_output = (torch.rand_like(outputs) - 0.5).sign()
+
+                # gettin perturbation weights
+                delta_kernel = torch.randn_like(self.weight_psi) * torch.exp(self.weight_psi)
+
+                # perturbed feedforward
+                perturbed_outputs = F.conv2d(input * sign_input,
+                                             weight=delta_kernel,
+                                             bias=None,
+                                             stride=self.stride,
+                                             padding=self.padding,
+                                             dilation=self.dilation,
+                                             groups=self.groups)
+                out = outputs + perturbed_outputs * sign_output
+            else:
+                bs = input.shape[0]
+                weight = self.mul_exp_add(torch.empty(bs, *self.weight_size,
+                                                      device=input.device,
+                                                      dtype=input.dtype).normal_(0, 1),
+                                          self.weight_psi, self.weight_mu).view(
+                                    bs*self.weight_size[0], *self.weight_size[1:])
+                out = F.conv2d(input.view(1, -1, input.shape[2], input.shape[3]),
+                               weight=weight, bias=None,
+                               stride=self.stride, dilation=self.dilation,
+                               groups=self.groups*bs, padding=self.padding)
+                out = out.view(bs, self.out_channels, out.shape[2], out.shape[3])
+
+                if self.bias:
+                    bias = self.mul_exp_add(torch.empty(bs, *self.bias_size,
+                                                        device=input.device,
+                                                        dtype=input.dtype).normal_(0, 1),
+                                            self.bias_psi, self.bias_mu)
+                    out = out + bias[:, :, None, None]
         else:
             if input.dim() == 4:
                 input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1, 1, 1)
 
-            weight = self.mul_exp_add(torch.randn(self.num_mc_samples,
+            weight = self.mul_exp_add(torch.empty(self.num_mc_samples,
                                                   *self.weight_size,
                                                   device=input.device,
-                                                  dtype=input.dtype),
+                                                  dtype=input.dtype).normal_(0, 1),
                                       self.weight_psi, self.weight_mu).view(
                 self.num_mc_samples*self.weight_size[0], *self.weight_size[1:])
             out = F.conv2d(input.flatten(start_dim=1, end_dim=2),
@@ -137,10 +182,10 @@ class BayesConv2dMF(_BayesConvNdMF):
             out = out.view(out.shape[0], self.num_mc_samples,
                            self.out_channels, out.shape[2], out.shape[3])
             if self.bias:
-                bias = self.mul_exp_add(torch.randn(self.num_mc_samples,
+                bias = self.mul_exp_add(torch.empty(self.num_mc_samples,
                                                     *self.bias_size,
                                                     device=input.device,
-                                                    dtype=input.dtype),
+                                                    dtype=input.dtype).normal_(0, 1),
                                         self.bias_psi, self.bias_mu)
                 out = out + bias[None, :, :, None, None]
         return out

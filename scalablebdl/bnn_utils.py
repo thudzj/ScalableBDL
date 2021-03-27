@@ -60,6 +60,27 @@ def _disable_parallel_eval(m):
             or isinstance(m, (BayesLinearEMP, BayesConv2dEMP, BayesBatchNorm2dEMP, BayesPReLUEMP)):
         m.parallel_eval = False
 
+def use_single_eps(net):
+    net.apply(_use_single_eps)
+
+def _use_single_eps(m):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF)):
+        m.single_eps = True
+
+def use_local_reparam(net):
+    net.apply(_use_local_reparam)
+
+def _use_local_reparam(m):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF)):
+        m.local_reparam = True
+
+def use_flipout(net):
+    net.apply(_use_flipout)
+
+def _use_flipout(m):
+    if isinstance(m, (BayesConv2dMF, BayesLinearMF)):
+        m.flipout = True
+
 def Bayes_ensemble(loader, model, loss_metric=torch.nn.functional.cross_entropy,
                    acc_metric=lambda arg1, arg2: (arg1.argmax(-1)==arg2).float().mean()):
     model.eval()

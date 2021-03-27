@@ -43,6 +43,10 @@ class BayesLinearMF(Module):
         self.bias_size = list(self.bias_mu.shape) if self.bias else None
         self.mul_exp_add = MulExpAddFunction.apply
 
+        self.local_reparam = False
+        self.flipout = False
+        self.single_eps = False
+
     def reset_parameters(self):
         stdv = 1. / math.sqrt(self.weight_mu.size(1))
         self.weight_mu.data.uniform_(-stdv, stdv)
@@ -60,33 +64,60 @@ class BayesLinearMF(Module):
             bias = self.bias_mu if self.bias else None
             out = F.linear(input, weight, bias)
         elif not self.parallel_eval:
-            bs = input.shape[0]
-            weight = self.mul_exp_add(torch.randn(bs, *self.weight_size,
-                                                  device=input.device,
-                                                  dtype=input.dtype),
-                                      self.weight_psi, self.weight_mu)
+            if self.single_eps:
+                weight = torch.randn_like(self.weight_mu).mul_(self.weight_psi.exp()).add_(self.weight_mu)
+                if self.bias:
+                    bias = torch.randn_like(self.bias_mu).mul_(self.bias_psi.exp()).add_(self.bias_mu)
+                else:
+                    bias = None
+                out = F.linear(input, weight, bias)
+            elif self.local_reparam:
+                act_mu = F.linear(input, self.weight_mu, None)
+                act_var = F.linear(input**2, (self.weight_psi*2).exp_(), None)
+                act_std = act_var.clamp(1e-8).sqrt_()
+                out = torch.randn_like(act_mu).mul_(act_std).add_(act_mu)
+                if self.bias:
+                    bias = torch.randn(input.shape[0], *self.bias_size, device=input.device, dtype=input.dtype).mul_(self.bias_psi.exp()).add_(self.bias_mu)
+                    out = out + bias
+            elif self.flipout:
+                outputs = F.linear(input, self.weight_mu, self.bias_mu if self.bias else None)
+                # sampling perturbation signs
+                sign_input = torch.empty_like(input).uniform_(-1, 1).sign()
+                sign_output = torch.empty_like(outputs).uniform_(-1, 1).sign()
+                # gettin perturbation weights
+                delta_kernel = torch.randn_like(self.weight_psi).mul(self.weight_psi.exp())
+                delta_bias = torch.randn_like(self.bias_psi).mul(self.bias_psi.exp()) if self.bias else None
+                # perturbed feedforward
+                perturbed_outputs = F.linear(input * sign_input, delta_kernel, delta_bias)
+                out = outputs + perturbed_outputs * sign_output
+            else:
+                bs = input.shape[0]
+                weight = self.mul_exp_add(torch.empty(bs, *self.weight_size,
+                                                      device=input.device,
+                                                      dtype=input.dtype).normal_(0, 1),
+                                          self.weight_psi, self.weight_mu)
 
-            out = torch.bmm(weight, input.unsqueeze(2)).squeeze()
-            if self.bias:
-                bias = self.mul_exp_add(torch.randn(bs, *self.bias_size,
-                                                  device=input.device,
-                                                  dtype=input.dtype),
-                                        self.bias_psi, self.bias_mu)
-                out = out + bias
+                out = torch.bmm(weight, input.unsqueeze(2)).squeeze()
+                if self.bias:
+                    bias = self.mul_exp_add(torch.empty(bs, *self.bias_size,
+                                                      device=input.device,
+                                                      dtype=input.dtype).normal_(0, 1),
+                                            self.bias_psi, self.bias_mu)
+                    out = out + bias
         else:
             if input.dim() == 2:
                 input = input.unsqueeze(1).repeat(1, self.num_mc_samples, 1)
-            weight = self.mul_exp_add(torch.randn(self.num_mc_samples,
+            weight = self.mul_exp_add(torch.empty(self.num_mc_samples,
                                                   *self.weight_size,
                                                   device=input.device,
-                                                  dtype=input.dtype),
+                                                  dtype=input.dtype).normal_(0, 1),
                                       self.weight_psi, self.weight_mu)
             out = torch.bmm(weight, input.permute(1, 2, 0)).permute(2, 0, 1)
             if self.bias:
-                bias = self.mul_exp_add(torch.randn(self.num_mc_samples, 
+                bias = self.mul_exp_add(torch.empty(self.num_mc_samples,
                                                     *self.bias_size,
                                                     device=input.device,
-                                                    dtype=input.dtype),
+                                                    dtype=input.dtype).normal_(0, 1),
                                         self.bias_psi, self.bias_mu)
                 out = out + bias
         return out
