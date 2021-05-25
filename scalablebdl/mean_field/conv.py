@@ -130,8 +130,8 @@ class BayesConv2dMF(_BayesConvNdMF):
                                    dilation=self.dilation, groups=self.groups)
 
                 # sampling perturbation signs
-                sign_input = (torch.rand_like(input) - 0.5).sign()
-                sign_output = (torch.rand_like(outputs) - 0.5).sign()
+                sign_input = torch.empty(input.size(0), input.size(1), 1, 1, device=input.device).uniform_(-1, 1).sign()
+                sign_output = torch.empty(outputs.size(0), outputs.size(1), 1, 1, device=input.device).uniform_(-1, 1).sign()
 
                 # gettin perturbation weights
                 delta_kernel = torch.randn_like(self.weight_psi) * torch.exp(self.weight_psi)
