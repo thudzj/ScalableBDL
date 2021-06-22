@@ -10,9 +10,10 @@ After *deterministic pre-training*, it is straight forward to convert the conver
 
 The current implementation only considers using mean-field Gaussian as approximate posterior, and more flexible distributions are under development.
 
-For more details, refer to [our paper](https://arxiv.org/pdf/2010.01979.pdf) and [GitHub page](https://thudzj.github.io/ScalableBDL/).
+For more details, refer to our [BayesAdapter paper](https://arxiv.org/pdf/2010.01979.pdf) and [GitHub page](https://thudzj.github.io/ScalableBDL/).
 
-
+## Bayesian fine-tuning based approach for adversarial detection
+We apply the Bayesian fine-tuning paradigm to detect adversarial examples, and observe promising results. See our [LiBRe paper](https://arxiv.org/pdf/2103.14835.pdf) for more details. To reproduce LiBRe, check [here](https://github.com/thudzj/ScalableBDL/tree/efficient/exps).
 
 ## Usage
 ### Dependencies
@@ -117,10 +118,18 @@ If you have any problem about this library or want to contribute to it, please s
 Please cite our paper if you use this code in your own work:
 ```
 @article{deng2020bayesadapter,
-  title={BayesAdapter: Being Bayesian, Inexpensively and Robustly, via Bayeisan Fine-tuning},
-  author={Deng, Zhijie and Yang, Xiao and Zhang, Hao and Dong, Yinpeng and Zhu, Jun},
+  title={BayesAdapter: Being Bayesian, Inexpensively and Reliably, via Bayesian Fine-tuning},
+  author={Deng, Zhijie and Zhang, Hao and Yang, Xiao and Dong, Yinpeng and Zhu, Jun},
   journal={arXiv preprint arXiv:2010.01979},
   year={2020}
+}
+
+@inproceedings{deng2021libre,
+  title={LiBRe: A Practical Bayesian Approach to Adversarial Detection},
+  author={Deng, Zhijie and Yang, Xiao and Xu, Shizhen and Su, Hang and Zhu, Jun},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={972--982},
+  year={2021}
 }
 ```
 
