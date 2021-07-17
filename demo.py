@@ -3,6 +3,7 @@ from tqdm import tqdm
 import torch
 from torch.optim import SGD
 from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, Bayes_ensemble
+from scalablebdl.prior_reg import PriorRegularizor
 from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
 
 import sys
@@ -20,6 +21,7 @@ if __name__ == '__main__':
     args.distributed = False
     args.batch_size = 32
     args.workers = 4
+    args.num_mc_samples = 20
     train_loader, test_loader = load_dataset(args)
 
     net = wrn(pretrained=True, depth=28, width=10).cuda()
@@ -37,11 +39,11 @@ if __name__ == '__main__':
     for name, param in bayesian_net.named_parameters():
         if 'psi' in name: psis.append(param)
         else: mus.append(param)
-    mu_optimizer = SGD(mus, lr=0.0008, momentum=0.9,
-                       weight_decay=2e-4, nesterov=True)
-    psi_optimizer = PsiSGD(psis, lr=0.1, momentum=0.9,
-                           weight_decay=2e-4, nesterov=True,
-                           num_data=50000)
+    optimizer = SGD([{"params": mus, "lr": 0.0008, "weight_decay": 2e-4},
+                     {"params": psis, "lr": 0.1, "weight_decay": 0}],
+                    momentum=0.9, nesterov=True)
+    regularizer = PriorRegularizor(bayesian_net, decay=2e-4, num_data=50000, 
+                                   num_mc_samples=args.num_mc_samples)
 
     for epoch in range(args.epochs):
         bayesian_net.train()
@@ -52,11 +54,10 @@ if __name__ == '__main__':
             output = bayesian_net(input)
             loss = torch.nn.functional.cross_entropy(output, target)
 
-            mu_optimizer.zero_grad()
-            psi_optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            mu_optimizer.step()
-            psi_optimizer.step()
+            regularizer.step()
+            optimizer.step()
 
             if i % 100 == 0:
                 print("Epoch {}, ite {}/{}, loss {}".format(epoch, i,

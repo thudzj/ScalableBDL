@@ -18,8 +18,8 @@ We apply the Bayesian fine-tuning paradigm to detect adversarial examples, and o
 ## Usage
 ### Dependencies
 + python 3
-+ torch 1.3.0
-+ torchvision 0.4.1
++ torch 1.3.0+
++ torchvision 0.4.1+
 
 ### Installation
 + `pip install git+https://github.com/thudzj/ScalableBDL.git`
@@ -31,6 +31,7 @@ With CIFAR-10 classification as an example, we can easily leverage this library 
 We first import the necessary modules for *Bayesian fine-tuning*:
 ```python
 from scalablebdl.bnn_utils import freeze, unfreeze, disable_dropout, Bayes_ensemble
+from scalablebdl.prior_reg import PriorRegularizor
 from scalablebdl.mean_field import PsiSGD, to_bayesian, to_deterministic
 ```
 
@@ -50,7 +51,7 @@ print('Results of deterministic pre-training, '
 
 To expand the point-estimate parameters into Bayesian variables, we only need to invoke
 ```python
-bayesian_net = to_bayesian(net)
+bayesian_net = to_bayesian(net, num_mc_samples=args.num_mc_samples)
 unfreeze(bayesian_net)
 ```
 
@@ -60,14 +61,14 @@ mus, psis = [], []
 for name, param in bayesian_net.named_parameters():
     if 'psi' in name: psis.append(param)
     else: mus.append(param)
-mu_optimizer = torch.optim.SGD(mus, lr=0.0008, momentum=0.9, 
-                               weight_decay=2e-4, nesterov=True)
-psi_optimizer = PsiSGD(psis, lr=0.1, momentum=0.9, 
-                       weight_decay=2e-4, nesterov=True, 
-                       num_data=50000)
+optimizer = SGD([{"params": mus, "lr": 0.0008, "weight_decay": 2e-4},
+                 {"params": psis, "lr": 0.1, "weight_decay": 0}],
+                momentum=0.9, nesterov=True)
+regularizer = PriorRegularizor(bayesian_net, decay=2e-4, num_data=50000,
+                               num_mc_samples=args.num_mc_samples)
 ```
 
-The optimizer for `psi` takes one more argument `num_data`, which is the size of the training dataset.
+The `regularizer` absorbs the KL divergence between the approximate posterior and the prior.
 
 
 After the preparation, we perform *Bayesian fine-tuning* just like fine-tuning a regular DNN, expect that our optimization involves two optimizers:
@@ -81,11 +82,10 @@ for epoch in range(args.epochs):
         output = bayesian_net(input)
         loss = torch.nn.functional.cross_entropy(output, target)
 
-        mu_optimizer.zero_grad()
-        psi_optimizer.zero_grad()
+        optimizer.zero_grad()
         loss.backward()
-        mu_optimizer.step()
-        psi_optimizer.step()
+	regularizer.step()
+        optimizer.step()
 
         if i % 100 == 0:
             print("Epoch {}, ite {}/{}, loss {}".format(epoch, i,
