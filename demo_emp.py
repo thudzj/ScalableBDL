@@ -2,7 +2,8 @@ import argparse
 from tqdm import tqdm
 import torch
 from torch.optim import SGD
-from scalablebdl.bnn_utils import set_mc_sample_id, disable_dropout
+from scalablebdl.bnn_utils import set_mc_sample_id, disable_dropout, Bayes_ensemble
+from scalablebdl.prior_reg import PriorRegularizor
 from scalablebdl.empirical import to_bayesian, to_deterministic
 
 import sys
@@ -23,25 +24,28 @@ if __name__ == '__main__':
     args.num_mc_samples = 20
     train_loader, test_loader = load_dataset(args)
 
-    net = wrn(pretrained=True, depth=28, width=10).cuda()
+    net = wrn(pretrained=True, depth=28, width=10)
     disable_dropout(net)
 
     net.stage_3[-1].conv2 = to_bayesian(net.stage_3[-1].conv2, args.num_mc_samples)
     net.lastact = to_bayesian(net.lastact, args.num_mc_samples)
-    net.classifier = to_bayesian(net.classifier, args.num_mc_samples)
 
-    pretrained_params, one_layer_bayes_params = [], []
+    net.cuda()
+
+    pretrained_params, bayes_params = [], []
     for name, param in net.named_parameters():
         if 'weights' in name or 'biases' in name:
-            one_layer_bayes_params.append(param)
+            bayes_params.append(param)
         else:
             pretrained_params.append(param)
 
-    pretrained_optimizer = SGD(pretrained_params, lr=0.0008, momentum=0.9,
-                               weight_decay=2e-4, nesterov=True)
-    one_layer_bayes_optimizer = SGD(one_layer_bayes_params, lr=0.1, momentum=0.9,
-                                    weight_decay=2e-4/args.num_mc_samples, nesterov=True)
-
+    optimizer = SGD([{"params": pretrained_params, "lr": 0.0008, "weight_decay": 2e-4},
+                     {"params": bayes_params, "lr": 0.1, "weight_decay": 0}],
+                    nesterov=True, momentum=0.9)
+    regularizer = PriorRegularizor(net, decay=2e-4, num_data=50000,
+                                   num_mc_samples=args.num_mc_samples,
+                                   posterior_type='emp',
+                                   MOPED=False)
     for epoch in range(args.epochs):
         net.train()
         for i, (input, target) in enumerate(train_loader):
@@ -52,11 +56,10 @@ if __name__ == '__main__':
             output = net(input)
             loss = torch.nn.functional.cross_entropy(output, target)
 
-            pretrained_optimizer.zero_grad()
-            one_layer_bayes_optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            pretrained_optimizer.step()
-            one_layer_bayes_optimizer.step()
+            regularizer.step()
+            optimizer.step()
 
             if i % 100 == 0:
                 print("Epoch {}, ite {}/{}, loss {}".format(epoch, i,

@@ -69,9 +69,10 @@ class _BayesConvNdLR(Module):
         s += ', padding={padding}'
         s += ', dilation={dilation}'
         s += ', groups={groups}'
-        s += ', bias={bias}'
         s += ', num_mc_samples={num_mc_samples}'
         s += ', rank={rank}'
+        if self.bias is None:
+            s += ', bias=False'
         return s.format(**self.__dict__)
 
     def __setstate__(self, state):

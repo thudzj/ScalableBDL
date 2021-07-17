@@ -29,6 +29,8 @@ class Block(nn.Module):
         if not self.equalInOut: residual = out
         out = self.conv2(self.relu(self.bn2(self.conv1(out))))
         if self.convShortcut is not None: residual = self.convShortcut(residual)
+        if residual.dim() == out.dim() - 1:
+            residual = residual.unsqueeze(1)
         return out + residual
 
 class WRN(nn.Module):
@@ -73,9 +75,16 @@ class WRN(nn.Module):
         x = self.stage_2(x)
         x = self.stage_3(x)
         x = self.lastact(x)
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        return self.classifier(x)
+        if x.dim() == 5:
+            y = self.avgpool(x.flatten(0, 1)).view(*x.shape[:3])
+            if isinstance(self.classifier, nn.Linear):
+                y = self.classifier(y.flatten(0, 1)).view(*y.shape[:2], -1)
+            else:
+                y = self.classifier(y)
+        else:
+            y = self.avgpool(x).view(*x.shape[:2])
+            y = self.classifier(y)
+        return y
 
 def wrn(pretrained=False, progress=True, depth=28, width=10, num_classes=10):
     model = WRN(depth, width, num_classes)
