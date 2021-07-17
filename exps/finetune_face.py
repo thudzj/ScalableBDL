@@ -31,7 +31,6 @@ from models.utils import load_state_dict_from_url
 
 # step 0: clone the ScalableBDL repo and checkout to the efficient branch
 sys.path.insert(0, '../')
-from scalablebdl.mean_field import PsiSGD
 from scalablebdl.mean_field import to_bayesian as to_bayesian_mfg
 from scalablebdl.empirical import to_bayesian as to_bayesian_emp
 from scalablebdl.bnn_utils import freeze, unfreeze, set_mc_sample_id, \
@@ -275,6 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                 weight_decay=args.decay)
     if not args.mc_dropout:
         if args.posterior_type == 'mfg':
+            from scalablebdl.mean_field import PsiSGD
             new_added_optimizer = PsiSGD(new_added, args.lr, args.momentum,
                                          weight_decay=args.decay)
         else:
